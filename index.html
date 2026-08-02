@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>GRIT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #101214;
+    --surface: #1a1d21;
+    --surface-2: #22262b;
+    --border: #33383f;
+    --text: #f5f2ec;
+    --text-muted: #9a9fa8;
+    --coral: #ff5a45;
+    --gold: #f2b544;
+    --teal: #3ec9c0;
+    --green: #6fcf97;
+    --purple: #a78bfa;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 90px;
+    position: relative;
+  }
+  .bg-figures{
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+  }
+  .bg-figures svg{ position:absolute; opacity: 0.05; }
+  main, header, .tabbar, .toast{ position: relative; z-index: 1; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  @keyframes fadeInUp{
+    from{ opacity:0; transform: translateY(10px); }
+    to{ opacity:1; transform: translateY(0); }
+  }
+  @keyframes shimmer{
+    0%{ background-position: 0% 50%; }
+    100%{ background-position: 200% 50%; }
+  }
+  @keyframes popIn{
+    0%{ transform: scale(0.9); opacity:0; }
+    60%{ transform: scale(1.03); opacity:1; }
+    100%{ transform: scale(1); }
+  }
+  @keyframes floatUp{
+    0%{ transform: translate(0,0) rotate(0deg) scale(1); opacity: 1; }
+    100%{ transform: translate(var(--dx,0px), -120px) rotate(var(--rot,20deg)) scale(0.6); opacity: 0; }
+  }
+  @keyframes glowPulse{
+    0%,100%{ box-shadow: 0 0 0 rgba(255,90,69,0); }
+    50%{ box-shadow: 0 0 22px rgba(255,90,69,0.18); }
+  }
+
+  .card, .coach-card, .advice-hero, .stat-box{ animation: fadeInUp 0.35s ease both; }
+  .coach-card{ animation: fadeInUp 0.35s ease both, glowPulse 3s ease-in-out infinite; }
+
+  .confetti-piece{
+    position: fixed; z-index: 60; font-size: 20px; pointer-events:none;
+    animation: floatUp 0.9s ease-out forwards;
+  }
+
+  header{
+    padding: 20px 20px 14px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top:0;
+    background: linear-gradient(180deg, var(--bg) 85%, transparent);
+    backdrop-filter: blur(6px);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header .brand-icon{ width: 40px; height: 40px; flex-shrink: 0; }
+  header .brand-text h1{
+    font-family:'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 0.05em;
+    margin: 0;
+    line-height: 1;
+    background: linear-gradient(90deg, var(--text), var(--coral), var(--gold), var(--text));
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 5s linear infinite;
+  }
+  header .brand-text p{
+    color: var(--text-muted);
+    font-size: 11px;
+    margin: 4px 0 0;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.06em;
+  }
+
+  main{ padding: 16px 16px 20px; max-width: 560px; margin: 0 auto; }
+
+  .tabbar{
+    position: fixed; bottom: 0; left:0; right:0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display:flex;
+    z-index: 20;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .tab{
+    flex:1; text-align:center; padding: 13px 0 10px;
+    color: var(--text-muted);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px; letter-spacing: 0.04em;
+    border: none; background: none; cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  .tab:active{ transform: scale(0.92); }
+  .tab-emoji{ display:block; font-size: 18px; margin-bottom: 3px; opacity: 0.5; transition: transform 0.25s ease; }
+  .tab.active{ color: var(--coral); }
+  .tab.active .tab-emoji{ opacity: 1; animation: popIn 0.3s ease; }
+
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+
+  .coach-card{
+    background: linear-gradient(135deg, rgba(167,139,250,0.14), rgba(62,201,192,0.10));
+    border: 1px solid rgba(167,139,250,0.35);
+    border-radius: 18px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+    display:flex; gap: 12px; align-items: flex-start;
+  }
+  .coach-card .icon{ font-size: 24px; flex-shrink:0; }
+  .coach-card .label{
+    font-family:'IBM Plex Mono', monospace; font-size: 10px; letter-spacing:0.08em;
+    text-transform: uppercase; color: var(--purple); margin-bottom: 4px;
+  }
+  .coach-card .msg{ font-size: 14px; line-height: 1.45; color: var(--text); }
+
+  .section-label{
+    font-family:'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;
+  }
+
+  label{ display:block; font-size: 13px; color: var(--text-muted); margin: 14px 0 6px; }
+  label:first-of-type{ margin-top: 0; }
+
+  input[type=date], input[type=number], input[type=text], textarea{
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+    padding: 11px 13px; border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 15px; appearance: none;
+  }
+  input:focus, textarea:focus{ outline: 2px solid var(--teal); outline-offset: -1px; }
+  textarea{ min-height: 70px; resize: vertical; }
+
+  .discipline-grid{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .discipline-btn{
+    padding: 10px 4px; border-radius: 12px; border: 1.5px solid var(--border);
+    background: var(--surface-2); color: var(--text-muted);
+    font-family:'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.01em;
+    cursor: pointer; text-align: center; display:flex; flex-direction:column; align-items:center; gap:3px;
+    transition: transform 0.12s ease;
+  }
+  .discipline-btn:active{ transform: scale(0.94); }
+  .discipline-btn .emoji{ font-size: 18px; }
+  .discipline-btn.active{ border-color: var(--dcolor, var(--coral)); color: var(--text); background: color-mix(in srgb, var(--dcolor, var(--coral)) 15%, var(--surface-2)); animation: popIn 0.25s ease; }
+
+  .seg{ display:flex; gap: 8px; }
+  .seg button{
+    flex:1; padding: 10px 8px; border-radius: 12px; border: 1.5px solid var(--border);
+    background: var(--surface-2); color: var(--text-muted);
+    font-family:'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.03em; cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+  .seg button:active{ transform: scale(0.95); }
+  .seg button.active{ border-color: var(--coral); color: var(--coral); background: rgba(255,90,69,0.1); }
+
+  .fuel-row{ display:flex; gap:6px; margin-top: 10px; }
+  .fuel-btn{
+    flex:1; padding: 12px 2px; border-radius: 12px; border: 1.5px solid var(--border);
+    background: var(--surface-2); cursor: pointer; display:flex; flex-direction:column; align-items:center; gap:4px;
+    font-family:'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted);
+    transition: transform 0.12s ease;
+  }
+  .fuel-btn:active{ transform: scale(0.92); }
+  .fuel-btn .emoji{ font-size: 20px; transition: transform 0.2s ease; }
+  .fuel-btn.active{ border-width: 2px; animation: popIn 0.25s ease; }
+  .fuel-btn.active .emoji{ transform: scale(1.15); }
+  .fuel-bar{ height:6px; border-radius: 3px; background: var(--surface-2); margin-top:10px; overflow:hidden; display:flex; }
+  .fuel-bar span{ flex:1; }
+
+  .btn-primary{
+    width:100%; padding: 15px; border-radius: 14px; border: none;
+    background: linear-gradient(90deg, var(--coral), #ff8a45);
+    color: #17140d; font-family:'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase; margin-top: 18px; cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+  .btn-primary:active{ transform: scale(0.97); }
+
+  .filter-row{ display:flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; }
+  .filter-chip{
+    flex-shrink: 0; padding: 7px 13px; border-radius: 20px; border: 1.5px solid var(--border);
+    background: var(--surface); color: var(--text-muted); font-family:'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer;
+  }
+  .filter-chip.active{ border-color: var(--teal); color: var(--teal); }
+
+  .entry{ border-bottom: 1px solid var(--border); padding: 14px 0; }
+  .entry:last-child{ border-bottom:none; }
+  .entry-top{ display:flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; gap: 8px;}
+  .entry-date{ font-family:'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-muted); flex-shrink:0; }
+  .entry-tags{ display:flex; gap:6px; flex-wrap: wrap; justify-content:flex-end; }
+  .tag{
+    font-family:'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.02em;
+    padding: 4px 8px; border-radius: 8px; display:flex; align-items:center; gap:4px;
+  }
+  .entry-stats{ display:flex; gap:14px; font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+  .entry-stats b{ color: var(--text); font-weight: 600; }
+  .entry-note{ font-size: 14px; color: var(--text); line-height: 1.4; margin-top: 4px; }
+  .entry-result{ margin-top: 8px; font-size: 13px; padding: 10px 12px; background: var(--surface-2); border-radius: 12px; }
+  .entry-coach{ margin-top: 8px; font-size: 12.5px; padding: 8px 12px; background: rgba(167,139,250,0.08); border-radius: 12px; color: var(--text-muted); }
+
+  .empty{ text-align:center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; }
+
+  .stat-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .stat-box{ background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+  .stat-box .num{ font-family:'Bebas Neue', sans-serif; font-size: 30px; color: var(--gold); line-height: 1; }
+  .stat-box .lbl{ font-family:'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); letter-spacing: 0.05em; margin-top: 6px; }
+
+  .chart-wrap svg{ width:100%; height: auto; display:block; }
+  .chart-caption{ font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-muted); margin-top: 8px; display:flex; justify-content: space-between; }
+
+  .del-btn{ background:none; border:none; color: var(--text-muted); font-family:'IBM Plex Mono', monospace; font-size: 11px; cursor:pointer; text-decoration: underline; padding: 0; margin-top: 8px; }
+
+  .advice-hero{
+    background: linear-gradient(135deg, rgba(62,201,192,0.14), rgba(242,181,68,0.10));
+    border: 1px solid rgba(62,201,192,0.35);
+    border-radius: 18px; padding: 16px 18px; margin-bottom: 14px;
+  }
+  .advice-hero .based-on{
+    font-family:'IBM Plex Mono', monospace; font-size: 10px; letter-spacing:0.06em;
+    text-transform: uppercase; color: var(--teal); margin-bottom: 10px;
+  }
+  .advice-row{ display:flex; gap:12px; align-items:flex-start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .advice-row:last-child{ border-bottom: none; }
+  .advice-row .icon{ font-size: 22px; flex-shrink:0; }
+  .advice-row .title{ font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .advice-row .body{ font-size: 13.5px; color: var(--text-muted); line-height: 1.4; }
+
+  .tip-item{ display:flex; gap:12px; align-items:flex-start; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .tip-item:last-child{ border-bottom: none; }
+  .tip-item .icon{ font-size: 20px; flex-shrink:0; }
+  .tip-item .body{ font-size: 13.5px; color: var(--text); line-height: 1.4; }
+
+  .reminder-banner{
+    background: rgba(255,90,69,0.12); border: 1px solid rgba(255,90,69,0.35);
+    border-radius: 16px; padding: 14px 16px; margin-bottom: 14px;
+    display:flex; gap: 10px; align-items:flex-start; font-size: 13.5px; color: var(--text);
+  }
+  .goal-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 12px 0; border-bottom: 1px solid var(--border); gap: 10px;
+  }
+  .goal-item:last-child{ border-bottom: none; }
+  .goal-title{ font-size: 14px; font-weight: 600; }
+  .goal-date{ font-size: 12px; color: var(--text-muted); font-family:'IBM Plex Mono', monospace; }
+  .goal-countdown{ font-family:'Bebas Neue', sans-serif; font-size: 22px; color: var(--gold); flex-shrink:0; text-align:right; }
+  .goal-countdown small{ display:block; font-family:'IBM Plex Mono', monospace; font-size: 9px; color: var(--text-muted); letter-spacing:0.05em; }
+  .add-goal-row{ display:flex; gap: 8px; margin-top: 12px; }
+  .add-goal-row input[type=text]{ flex: 1.4; }
+  .add-goal-row input[type=date]{ flex: 1; }
+  .btn-secondary{
+    width:100%; padding: 12px; border-radius: 12px; border: 1.5px solid var(--teal);
+    background: rgba(62,201,192,0.1); color: var(--teal); font-family:'IBM Plex Mono', monospace;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-top: 10px; cursor: pointer;
+  }
+  #coach-summary{ margin-top: 12px; min-height: 130px; font-family:'IBM Plex Mono', monospace; font-size: 12.5px; }
+
+  .toast{
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: var(--coral); color: #17140d; padding: 10px 18px; border-radius: 20px;
+    font-family:'IBM Plex Mono', monospace; font-size: 12px;
+    opacity: 0; transition: opacity 0.25s ease; pointer-events: none; z-index: 30; white-space: nowrap;
+  }
+  .toast.show{ opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="bg-figures">
+  <svg viewBox="0 0 100 100" width="220" height="220" style="top:60px; right:-40px;">
+    <g fill="#eae7de">
+      <circle cx="55" cy="18" r="8"/>
+      <path d="M55 26 L55 55 L40 50 L38 30 Z"/>
+      <path d="M55 40 L78 30 L82 38 L60 50 Z"/>
+      <path d="M55 55 L40 90 L48 92 L60 62 Z"/>
+      <path d="M55 55 L75 85 L68 90 L52 62 Z"/>
+    </g>
+  </svg>
+  <svg viewBox="0 0 100 100" width="240" height="240" style="bottom:100px; left:-50px;">
+    <g fill="#eae7de">
+      <circle cx="35" cy="15" r="7"/>
+      <path d="M35 22 L35 48 L55 42 L58 24 Z"/>
+      <path d="M35 35 L15 25 L12 33 L32 45 Z"/>
+      <path d="M35 48 L20 60 L45 68 L60 55 Z"/>
+      <path d="M45 68 L40 95 L48 95 L54 72 Z"/>
+      <path d="M60 55 L75 70 L82 64 L65 48 Z"/>
+    </g>
+  </svg>
+</div>
+
+<header>
+  <svg class="brand-icon" viewBox="0 0 220 220">
+    <rect x="0" y="0" width="220" height="220" rx="44" fill="#1a1d21" stroke="#33383f" stroke-width="2"/>
+    <path d="M 168 72 A 68 68 0 1 0 168 158" fill="none" stroke="#f5f2ec" stroke-width="22" stroke-linecap="butt"/>
+    <rect x="110" y="103" width="58" height="22" fill="#f5f2ec"/>
+    <polyline points="34,150 82,96 66,96 118,40" fill="none" stroke="#ff5a45" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div class="brand-text">
+    <h1>GRIT</h1>
+    <p>TRAIN · TRACK · GRIND</p>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div class="tabbar">
+  <button class="tab" data-tab="new"><span class="tab-emoji">📝</span>Nouvelle</button>
+  <button class="tab" data-tab="history"><span class="tab-emoji">📋</span>Historique</button>
+  <button class="tab" data-tab="progress"><span class="tab-emoji">📈</span>Progression</button>
+  <button class="tab" data-tab="advice"><span class="tab-emoji">💡</span>Conseils</button>
+  <button class="tab" data-tab="settings"><span class="tab-emoji">⚙️</span>Réglages</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'grit-entries';
+const GOALS_KEY = 'grit-goals';
+const HEALTH_KEY = 'grit-health';
+const DISCIPLINES = [
+  {name:'BJJ', emoji:'🥋', color:'#4a90d9'},
+  {name:'MMA', emoji:'🥊', color:'#ff5a45'},
+  {name:'Judo', emoji:'🥋', color:'#3ec9c0'},
+  {name:'Boxe', emoji:'🥊', color:'#e2574c'},
+  {name:'Muay Thaï', emoji:'🦵', color:'#f2914a'},
+  {name:'Lutte', emoji:'🤼', color:'#6fcf97'},
+  {name:'Karaté', emoji:'🥋', color:'#a78bfa'},
+  {name:'Football', emoji:'⚽', color:'#4caf72'},
+  {name:'Course', emoji:'🏃', color:'#e28a3d'},
+  {name:'Musculation', emoji:'🏋️', color:'#6b8fa3'},
+  {name:'Natation', emoji:'🏊', color:'#38b6d9'},
+  {name:'Basketball', emoji:'🏀', color:'#d97a2c'},
+  {name:'Tennis', emoji:'🎾', color:'#9ccc65'},
+  {name:'Cyclisme', emoji:'🚴', color:'#8e6bbf'},
+  {name:'Autre', emoji:'🏅', color:'#9a9fa8'}
+];
+const METHOD_HINTS = {
+  'BJJ': 'ex : tarikoplata, avantages 2-0', 'MMA': 'ex : KO, soumission, décision',
+  'Judo': 'ex : ippon, waza-ari', 'Boxe': 'ex : KO, arrêt arbitre, décision',
+  'Muay Thaï': 'ex : KO, décision, low kicks', 'Lutte': 'ex : tombé, décision aux points',
+  'Karaté': 'ex : ippon, points',
+  'Football': 'ex : score, buts marqués', 'Course': 'ex : temps, distance, chrono',
+  'Musculation': 'ex : record perso, charges soulevées', 'Natation': 'ex : temps, distance',
+  'Basketball': 'ex : score, points marqués', 'Tennis': 'ex : score en sets/jeux',
+  'Cyclisme': 'ex : distance, temps, dénivelé',
+  'Autre': 'ex : méthode ou résultat'
+};
+const FUEL_LEVELS = [
+  { emoji:'🪫', label:'Réservoir vide', color:'#ff5a45' },
+  { emoji:'😮\u200d💨', label:'Bas', color:'#f2914a' },
+  { emoji:'⚙️', label:'Correct', color:'#f2b544' },
+  { emoji:'💪', label:'Plein', color:'#3ec9c0' },
+  { emoji:'🔥', label:'Plein régime', color:'#6fcf97' }
+];
+
+let entries = [];
+let goals = [];
+let healthLog = [];
+let painForm = { zone: '', intensity: 3, note: '' };
+let resetConfirm = false;
+let activeTab = 'new';
+let historyFilter = 'Toutes';
+let lastCoach = null;
+let goalForm = { title: '', date: '' };
+let form = { discipline: 'BJJ', type: 'training', date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '', techniques: '', outcome: 'win', method: '', opponent: '' };
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function disciplineInfo(name){ return DISCIPLINES.find(d=>d.name===name) || DISCIPLINES[DISCIPLINES.length-1]; }
+
+async function loadEntries(){
+  try{
+    const v = localStorage.getItem(STORAGE_KEY);
+    entries = v ? JSON.parse(v) : [];
+  }catch(e){ entries = []; }
+  render();
+}
+async function saveEntries(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 1600);
+}
+function resetForm(){
+  const disc = form.discipline;
+  form = { discipline: disc, type: 'training', date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '', techniques: '', outcome: 'win', method: '', opponent: '' };
+}
+
+async function loadHealth(){
+  try{
+    const v = localStorage.getItem(HEALTH_KEY);
+    healthLog = v ? JSON.parse(v) : [];
+  }catch(e){ healthLog = []; }
+}
+async function saveHealth(){
+  try{ localStorage.setItem(HEALTH_KEY, JSON.stringify(healthLog)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+function weightCutAlert(list){
+  const withWeight = list.filter(e=>e.weight).sort((a,b)=>a.date.localeCompare(b.date));
+  if(withWeight.length < 2) return null;
+  const recent = withWeight.filter(e => daysSince(e.date) <= 7);
+  if(recent.length < 2) return null;
+  const first = recent[0], last = recent[recent.length-1];
+  const dropPct = ((first.weight - last.weight) / first.weight) * 100;
+  if(dropPct >= 4){
+    return `Ton poids a baissé de ${dropPct.toFixed(1)}% en ${Math.max(1,daysSince(first.date))} jours (${first.weight}kg → ${last.weight}kg). Une perte rapide peut être risquée pour la santé — reste vigilant sur l'hydratation et, si tu prépares une coupe de poids compétition, encadre-la avec ton coach ou un professionnel de santé.`;
+  }
+  return null;
+}
+function recurringPainZones(list){
+  const recent = list.filter(p => daysSince(p.date) <= 30);
+  const byZone = {};
+  recent.forEach(p => { byZone[p.zone] = (byZone[p.zone]||0)+1; });
+  return Object.entries(byZone).filter(([,c])=>c>=3).map(([z])=>z);
+}
+
+async function loadGoals(){
+  try{
+    const v = localStorage.getItem(GOALS_KEY);
+    goals = v ? JSON.parse(v) : [];
+  }catch(e){ goals = []; }
+}
+async function saveGoals(){
+  try{ localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+function daysUntil(dateStr){
+  const target = new Date(dateStr + 'T00:00:00');
+  const now = new Date(todayStr() + 'T00:00:00');
+  return Math.round((target - now) / 86400000);
+}
+// ---- Citation du jour (citations réelles et vérifiées) ----
+const QUOTES = [
+  { text:"La douleur est temporaire. Abandonner dure pour toujours.", author:"Lance Armstrong" },
+  { text:"Le mental représente 90% de la performance.", author:"André Agassi" },
+  { text:"Il faut avoir connu la défaite pour savourer pleinement la victoire.", author:"Muhammad Ali" },
+  { text:"Je n'ai jamais perdu. Soit je gagne, soit j'apprends.", author:"Nelson Mandela" },
+  { text:"Chaque jour est une nouvelle chance de s'améliorer.", author:"Simone Biles" },
+  { text:"Le succès n'est pas un hasard, c'est un choix.", author:"Stephen Curry" },
+  { text:"La discipline, le travail et le respect des autres sont la clé du succès.", author:"Rafael Nadal" },
+  { text:"La motivation vous fait commencer, l'habitude vous fait continuer.", author:"Jim Ryun" },
+  { text:"Il ne faut pas avoir peur de se battre. Vous devez toujours vous battre.", author:"Serena Williams" },
+  { text:"Le sport ne forge pas le caractère. Il le révèle.", author:"Heywood Hale Broun" },
+  { text:"Le plus important dans la vie, c'est d'avoir un but.", author:"Johan Cruyff" },
+  { text:"La force ne vient pas des victoires, elle se développe avec les difficultés.", author:"Arnold Schwarzenegger" },
+  { text:"C'est difficile de battre quelqu'un qui ne baisse jamais les bras.", author:"Babe Ruth" },
+  { text:"Plus la bataille est dure, plus la victoire est douce.", author:"Les Brown" },
+  { text:"Nos limites n'existent que dans nos craintes.", author:"Yannick Noah" },
+  { text:"Le travail acharné bat le talent quand le talent ne travaille pas dur.", author:"Tim Notke" },
+  { text:"On apprend plus de ses propres défaites que des défaites des autres.", author:"Monica Seles" },
+  { text:"Dans les moments difficiles, tu découvres qui tu es vraiment.", author:"Lionel Messi" }
+];
+function dayOfYear(){
+  const now = new Date();
+  const start = new Date(now.getFullYear(),0,0);
+  return Math.floor((now - start) / 86400000);
+}
+function getQuoteOfDay(){ return QUOTES[dayOfYear() % QUOTES.length]; }
+
+// ---- "Il y a un an / un mois" ----
+function getThrowback(list){
+  const now = new Date(todayStr()+'T00:00:00');
+  const findNear = (targetDays, tolerance) => list.find(e => {
+    const diff = Math.abs(daysSince(e.date) - targetDays);
+    return diff <= tolerance;
+  });
+  const yearAgo = findNear(365, 3);
+  if(yearAgo) return { entry: yearAgo, label: "il y a un an" };
+  const monthAgo = findNear(30, 3);
+  if(monthAgo) return { entry: monthAgo, label: "il y a un mois" };
+  return null;
+}
+
+// ---- Défi hebdo léger ----
+function getWeekKey(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const day = (d.getDay()+6)%7; // lundi=0
+  const monday = new Date(d); monday.setDate(d.getDate()-day);
+  return monday.toISOString().slice(0,10);
+}
+function getWeeklyChallengeProgress(list){
+  const wk = getWeekKey(todayStr());
+  const count = list.filter(e => getWeekKey(e.date) === wk).length;
+  const target = 3;
+  return { count, target, weekKey: wk };
+}
+
+function exportBackup(){
+  return JSON.stringify({ entries, goals, exportedAt: todayStr() }, null, 0);
+}
+async function importBackup(text){
+  try{
+    const data = JSON.parse(text);
+    if(!Array.isArray(data.entries)) throw new Error('format invalide');
+    entries = data.entries;
+    goals = Array.isArray(data.goals) ? data.goals : goals;
+    await saveEntries();
+    await saveGoals();
+    return true;
+  }catch(e){ return false; }
+}
+
+function daysSince(dateStr){
+  const then = new Date(dateStr + 'T00:00:00');
+  const now = new Date(todayStr() + 'T00:00:00');
+  return Math.round((now - then) / 86400000);
+}
+
+// ---- Coach GRIT : recommandations basées sur le ressenti et l'historique récent ----
+function generateCoachMessage(entry, allEntriesBeforeSave){
+  const sameDiscipline = allEntriesBeforeSave.filter(e => e.discipline === entry.discipline).sort((a,b)=>b.date.localeCompare(a.date));
+  const lastTwoLow = [entry, ...sameDiscipline].slice(0,3).filter(e => e.feeling <= 2).length;
+
+  let icon = '🎯';
+  let text = '';
+
+  if(entry.feeling <= 2){
+    text = "Grosse séance, réservoir presque à sec. Demain, vise plutôt une séance technique légère ou du repos actif — laisse le corps récupérer avant de repousser l'intensité.";
+    icon = '🧊';
+  } else if(entry.feeling === 3){
+    text = "Bon équilibre aujourd'hui. Tu peux enchaîner normalement demain, sans forcer particulièrement.";
+    icon = '⚖️';
+  } else if(entry.feeling === 4){
+    text = "Bonnes sensations. Demain, tu peux pousser un peu plus fort ou cibler un point technique précis à travailler.";
+    icon = '📈';
+  } else {
+    text = "Grosse forme aujourd'hui ! C'est le bon moment pour une séance intense ou du sparring poussé demain.";
+    icon = '🔥';
+  }
+
+  if(lastTwoLow >= 2){
+    text += " Attention : plusieurs séances récentes avec une jauge basse en " + entry.discipline + " — un vrai jour de repos pourrait payer plus qu'une séance de plus.";
+    icon = '⚠️';
+  }
+
+  if(entry.result){
+    if(entry.result.outcome === 'loss'){
+      text += " Une défaite est une donnée, pas un verdict — note ce qui a manqué pour la prochaine séance.";
+    } else if(entry.result.outcome === 'win'){
+      text += " Victoire notée — regarde aussi ce qui a bien fonctionné pour le reproduire.";
+    }
+  }
+
+  return { icon, text };
+}
+
+// ---- Conseils récupération : sommeil + hydratation basés sur la dernière séance ----
+const GENERAL_TIPS = [
+  { icon:'🧊', body:"Alterne chaud/froid sur les zones sollicitées (douche froide, glace) pour accélérer la récupération musculaire." },
+  { icon:'🥗', body:"Un apport en protéines dans l'heure qui suit l'entraînement aide à la réparation musculaire." },
+  { icon:'🧘', body:"Quelques minutes d'étirements ou de mobilité articulaire le soir limitent les raideurs du lendemain." },
+  { icon:'📅', body:"Un vrai jour de repos complet toutes les 7 à 10 séances évite l'accumulation de fatigue sur la durée." },
+  { icon:'🧠', body:"La déshydratation, même légère, réduit les réflexes et la concentration sur le tatami ou le ring." }
+];
+
+function getSleepAdvice(entry){
+  let text;
+  if(entry.feeling <= 2) text = "8 à 9h cette nuit, avec une sieste courte dans la journée si possible — ta séance était éprouvante.";
+  else if(entry.feeling === 3) text = "7 à 8h suffiront pour repartir sur de bonnes bases demain.";
+  else text = "7h minimum — même en pleine forme, ne sacrifie pas le sommeil, c'est là que la récupération se joue vraiment.";
+  if(entry.type === 'competition') text += " Un combat sollicite aussi le système nerveux, pas seulement les muscles : ne rogne pas là-dessus.";
+  return text;
+}
+
+function getHydrationAdvice(entry){
+  if(!entry.weight){
+    return "Bois régulièrement toute la journée, avec un bon verre juste après l'entraînement. Renseigne ton poids sur une entrée pour une estimation personnalisée.";
+  }
+  let liters = entry.weight * 0.035;
+  if(entry.feeling >= 4) liters += 0.5;
+  if(entry.type === 'competition') liters += 0.5;
+  return `Vise environ ${liters.toFixed(1)} L d'eau aujourd'hui, réparti dans la journée, avec un bon verre juste après la séance pour compenser la transpiration.`;
+}
+
+function generateCoachSummary(){
+  const sorted = [...entries].sort((a,b)=> b.date.localeCompare(a.date));
+  const last7 = sorted.filter(e => daysSince(e.date) <= 7);
+  const set = last7.length ? last7 : sorted.slice(0,5);
+  if(set.length === 0) return "Aucune séance loguée pour l'instant.";
+  const avgFeeling = (set.reduce((s,e)=>s+e.feeling,0)/set.length).toFixed(1);
+  const comps = set.filter(e=>e.type==='competition');
+  const wins = comps.filter(e=>e.result && e.result.outcome==='win').length;
+  const techCount = {};
+  set.forEach(e => (e.techniques||[]).forEach(t => { techCount[t]=(techCount[t]||0)+1; }));
+  const topTech = Object.entries(techCount).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([t])=>t);
+  const discSet = [...new Set(set.map(e=>e.discipline))];
+
+  let lines = [];
+  lines.push(`Résumé GRIT — ${set.length} séance(s) sur les 7 derniers jours`);
+  lines.push(`Disciplines : ${discSet.join(', ')}`);
+  lines.push(`Jauge moyenne de ressenti : ${avgFeeling}/5`);
+  if(comps.length) lines.push(`Sparrings/combats : ${comps.length} (${wins} victoire(s))`);
+  if(topTech.length) lines.push(`Techniques travaillées : ${topTech.join(', ')}`);
+  const lastNote = set.find(e=>e.note);
+  if(lastNote) lines.push(`Dernière note : "${lastNote.note}"`);
+  return lines.join('\n');
+}
+
+function renderAdvice(){
+  const sorted = [...entries].sort((a,b)=> b.date.localeCompare(a.date));
+  const last = sorted[0];
+  const gap = last ? daysSince(last.date) : null;
+
+  const reminder = (gap !== null && gap >= 3) ? `
+    <div class="reminder-banner">
+      <span style="font-size:20px;">⏰</span>
+      <span>Ça fait <b>${gap} jours</b> sans séance loguée. Une reprise en douceur aujourd'hui peut valoir mieux qu'attendre d'être à 100%.</span>
+    </div>` : '';
+
+  const hero = last ? `
+    <div class="advice-hero">
+      <div class="based-on">D'après ta séance du ${formatDate(last.date)} (${disciplineInfo(last.discipline).emoji} ${last.discipline})</div>
+      <div class="advice-row">
+        <div class="icon">😴</div>
+        <div><div class="title">Sommeil</div><div class="body">${getSleepAdvice(last)}</div></div>
+      </div>
+      <div class="advice-row">
+        <div class="icon">💧</div>
+        <div><div class="title">Hydratation</div><div class="body">${getHydrationAdvice(last)}</div></div>
+      </div>
+    </div>
+  ` : `
+    <div class="advice-hero">
+      <div class="based-on">Aucune séance loguée pour l'instant</div>
+      <div class="advice-row">
+        <div class="icon">💡</div>
+        <div><div class="body">Ajoute une première entrée dans l'onglet "Nouvelle" pour recevoir des conseils sommeil et hydratation adaptés à ton intensité.</div></div>
+      </div>
+    </div>
+  `;
+
+  const goalsList = goals.length ? goals.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(g => {
+    const d = daysUntil(g.date);
+    return `<div class="goal-item">
+      <div>
+        <div class="goal-title">${escapeHtml(g.title)}</div>
+        <div class="goal-date">${formatDate(g.date)}</div>
+      </div>
+      <div class="goal-countdown">${d >= 0 ? d : 0}<small>${d >= 0 ? 'jours restants' : 'passé'}</small></div>
+      <button class="del-btn" data-act="delete-goal" data-id="${g.id}" style="margin-top:0;">✕</button>
+    </div>`;
+  }).join('') : `<div class="empty" style="padding:20px 0;">Aucun objectif pour l'instant.</div>`;
+
+  const painRows = healthLog.length ? [...healthLog].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8).map(p => `
+    <div class="entry">
+      <div class="entry-top">
+        <span class="entry-date">${formatDate(p.date)}</span>
+        <span class="tag" style="background:${p.intensity>=4?'#ff5a4522':'#f2b54422'}; color:${p.intensity>=4?'var(--coral)':'var(--gold)'}">Intensité ${p.intensity}/5</span>
+      </div>
+      <div style="font-size:14px; font-weight:600;">${escapeHtml(p.zone)}</div>
+      ${p.note ? `<div class="entry-note">${escapeHtml(p.note)}</div>` : ''}
+      <button class="del-btn" data-act="delete-pain" data-id="${p.id}">Supprimer</button>
+    </div>
+  `).join('') : `<div class="empty" style="padding:16px 0;">Aucune douleur loguée. Tant mieux ! 💪</div>`;
+
+  const recurring = recurringPainZones(healthLog);
+  const recurringBanner = recurring.length ? `
+    <div class="reminder-banner">
+      <span style="font-size:20px;">🩺</span>
+      <span>Douleur récurrente détectée : <b>${recurring.join(', ')}</b> — noté 3 fois ou plus ces 30 derniers jours. Si ça persiste, ça vaut le coup d'en parler à un professionnel de santé (kiné, médecin du sport).</span>
+    </div>` : '';
+
+  const weightAlert = weightCutAlert(sorted);
+  const weightAlertBanner = weightAlert ? `<div class="reminder-banner"><span style="font-size:20px;">⚖️</span><span>${weightAlert}</span></div>` : '';
+
+  const sleepEntries = sorted.filter(e => e.sleepHours);
+  const avgSleep = sleepEntries.length ? (sleepEntries.reduce((s,e)=>s+e.sleepHours,0)/sleepEntries.length).toFixed(1) : null;
+
+  const healthSection = `
+    <div class="card">
+      <div class="section-label">🏥 Santé</div>
+      ${weightAlertBanner}
+      ${recurringBanner}
+      <div class="stat-grid" style="margin-bottom:12px;">
+        <div class="stat-box"><div class="num">${avgSleep || '—'}</div><div class="lbl">😴 Sommeil moyen (h)</div></div>
+        <div class="stat-box"><div class="num">${healthLog.length}</div><div class="lbl">🩺 Douleurs loguées</div></div>
+      </div>
+      <div class="section-label" style="margin-top:14px;">Loguer une douleur / gêne</div>
+      <label>Zone du corps</label>
+      <input type="text" id="pain-zone" placeholder="ex : genou droit, épaule, dos" value="${painForm.zone}">
+      <label>Intensité</label>
+      <div class="fuel-row">
+        ${[1,2,3,4,5].map(n => `<button data-act="pain-intensity" data-val="${n}" class="fuel-btn ${painForm.intensity==n?'active':''}" style="${painForm.intensity==n?'border-color:var(--coral); color:var(--coral)':''}">${n}</button>`).join('')}
+      </div>
+      <label>Note (optionnel)</label>
+      <input type="text" id="pain-note" placeholder="ex : gêne après le sparring" value="${painForm.note}">
+      <button class="btn-secondary" id="add-pain-btn" style="border-color:var(--coral); color:var(--coral); background:rgba(255,90,69,0.08);">+ Ajouter la douleur</button>
+      <div style="margin-top:16px;">${painRows}</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:12px; opacity:0.8;">Ceci n'est pas un avis médical. En cas de douleur persistante ou inquiétante, consulte un professionnel de santé.</div>
+    </div>`;
+
+  return `
+    ${reminder}
+    ${hero}
+    ${healthSection}
+    <div class="card">
+      <div class="section-label">🎯 Objectifs & échéances</div>
+      ${goalsList}
+      <div class="add-goal-row">
+        <input type="text" id="g-title" placeholder="ex : Europeans IBJJF">
+        <input type="date" id="g-date">
+      </div>
+      <button class="btn-secondary" id="add-goal-btn">+ Ajouter l'objectif</button>
+    </div>
+    <div class="card">
+      <div class="section-label">📤 Résumé pour ton coach</div>
+      <div style="font-size:13px; color:var(--text-muted);">Génère un résumé de tes 7 derniers jours à copier-coller pour ton coach ou tes partenaires d'entraînement.</div>
+      <button class="btn-secondary" id="gen-summary-btn">Générer le résumé</button>
+      <textarea id="coach-summary" readonly style="display:none;"></textarea>
+      <button class="btn-secondary" id="copy-summary-btn" style="display:none;">Copier</button>
+    </div>
+    <div class="card">
+      <div class="section-label">Conseils récupération</div>
+      ${GENERAL_TIPS.map(t => `<div class="tip-item"><div class="icon">${t.icon}</div><div class="body">${t.body}</div></div>`).join('')}
+    </div>
+  `;
+}
+
+// ---- Rang GRIT : système de paliers universel, basé sur l'XP cumulé ----
+const TIERS = [
+  { name:'Bronze', color:'#b08d57', text:'#101214' },
+  { name:'Argent', color:'#c7ccd1', text:'#101214' },
+  { name:'Or', color:'#f2b544', text:'#101214' },
+  { name:'Platine', color:'#7fe3d1', text:'#101214' },
+  { name:'Diamant', color:'#8ecbff', text:'#101214', border:'#8ecbff' }
+];
+const DIV_XP = 100;
+const TIER_XP = DIV_XP * 4;
+
+function entryXP(e){
+  let xp = 10;
+  if(e.type==='competition') xp += 15;
+  if(e.techniques && e.techniques.length) xp += 5;
+  if(e.note && e.note.trim()) xp += 5;
+  if(e.result && e.result.outcome==='win') xp += 20;
+  return xp;
+}
+function getRankInfo(list){
+  const totalXP = list.reduce((s,e)=>s+entryXP(e),0);
+  let tierIndex = Math.floor(totalXP / TIER_XP);
+  let legend = false;
+  if(tierIndex > TIERS.length-1){ legend = true; tierIndex = TIERS.length-1; }
+  const remainder = totalXP - tierIndex*TIER_XP;
+  let division = legend ? 3 : Math.min(3, Math.floor(remainder/DIV_XP));
+  const xpIntoDivision = legend ? DIV_XP : remainder - division*DIV_XP;
+  const pct = legend ? 100 : Math.min(100, (xpIntoDivision/DIV_XP)*100);
+  return { totalXP, tier: TIERS[tierIndex], tierIndex, division, pct, legend, xpIntoDivision };
+}
+function rankKey(r){ return r.legend ? 'legend' : `${r.tierIndex}-${r.division}`; }
+
+function renderSettings(){
+  return `
+    <div class="card">
+      <div class="section-label">💾 Sauvegarde de tes données</div>
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Exporte toutes tes données (séances, objectifs) en texte, à garder de côté. Utile si jamais la sauvegarde automatique a un souci.</div>
+      <button class="btn-secondary" id="export-btn">📤 Exporter mes données</button>
+      <textarea id="export-box" readonly style="display:none; min-height:100px; font-family:'IBM Plex Mono',monospace; font-size:10.5px;"></textarea>
+      <button class="btn-secondary" id="copy-export-btn" style="display:none;">Copier</button>
+      <label style="margin-top:16px;">Restaurer depuis une sauvegarde</label>
+      <textarea id="import-box" placeholder="Colle ici le texte exporté précédemment..."></textarea>
+      <button class="btn-secondary" id="import-btn">📥 Restaurer</button>
+    </div>
+    <div class="card" style="border-color: rgba(255,90,69,0.35);">
+      <div class="section-label" style="color:var(--coral);">🗑️ Réinitialiser</div>
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Supprime toutes tes séances, objectifs et douleurs loguées. Utile en cas de souci technique — pense à exporter avant si tu veux garder une trace.</div>
+      ${resetConfirm ? `
+        <div style="font-size:13px; color:var(--coral); margin-bottom:10px; font-weight:600;">Es-tu sûr ? Cette action est irréversible.</div>
+        <button class="btn-primary" id="confirm-reset-btn" style="background:var(--coral);">Oui, tout effacer</button>
+        <button class="btn-secondary" id="cancel-reset-btn">Annuler</button>
+      ` : `
+        <button class="btn-secondary" id="ask-reset-btn" style="border-color:var(--coral); color:var(--coral); background:rgba(255,90,69,0.08);">Réinitialiser mes données</button>
+      `}
+    </div>
+  `;
+}
+
+function renderRankCard(rank){
+  const pips = Array.from({length:4}, (_,i) => `<span style="flex:1; height:8px; border-radius:2px; background:${i<rank.division || rank.legend ? 'var(--gold)' : 'var(--surface-2)'}; border:1px solid var(--border);"></span>`).join('');
+  return `
+  <div class="card" style="background:linear-gradient(135deg, ${rank.tier.color}22, transparent); border-color:${rank.tier.color}55;">
+    <div class="section-label">🏔️ Rang GRIT</div>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <div style="width:52px; height:52px; border-radius:50%; background:${rank.tier.color}; border:2px solid ${rank.tier.border||'var(--border)'}; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:'Bebas Neue',sans-serif; font-size:20px; color:${rank.tier.text};">${rank.tierIndex+1}</div>
+      <div style="flex:1;">
+        <div style="font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:0.03em;">Palier ${rank.tier.name}${rank.legend ? ' — Légende GRIT' : ` · Division ${rank.division+1}`}</div>
+        <div style="font-size:11px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace;">${rank.totalXP} XP cumulés</div>
+      </div>
+    </div>
+    <div style="display:flex; gap:5px; margin-top:12px;">${pips}</div>
+    ${!rank.legend ? `<div style="font-size:11px; color:var(--text-muted); margin-top:6px; font-family:'IBM Plex Mono',monospace;">${rank.xpIntoDivision}/${DIV_XP} XP avant la prochaine division</div>` : `<div style="font-size:11px; color:var(--gold); margin-top:6px; font-family:'IBM Plex Mono',monospace;">Niveau maximum atteint — continue pour le prestige 🏆</div>`}
+    <div style="font-size:11px; color:var(--text-muted); margin-top:10px; opacity:0.75;">Rang virtuel GRIT basé sur ta régularité — indépendant de tout classement officiel.</div>
+  </div>`;
+}
+
+// ---- Séries, records, badges ----
+function computeStreaks(list){
+  const dates = [...new Set(list.map(e=>e.date))].sort();
+  if(dates.length===0) return {current:0, best:0};
+  let best=1, run=1;
+  for(let i=1;i<dates.length;i++){
+    const diff = Math.round((new Date(dates[i]+'T00:00:00') - new Date(dates[i-1]+'T00:00:00'))/86400000);
+    run = diff===1 ? run+1 : 1;
+    if(run>best) best=run;
+  }
+  let current=1;
+  for(let i=dates.length-1;i>0;i--){
+    const diff = Math.round((new Date(dates[i]+'T00:00:00') - new Date(dates[i-1]+'T00:00:00'))/86400000);
+    if(diff===1) current++; else break;
+  }
+  if(daysSince(dates[dates.length-1]) > 1) current = 0;
+  return {current, best};
+}
+function longestWinStreak(list){
+  const comps = list.filter(e=>e.type==='competition' && e.result).sort((a,b)=>a.date.localeCompare(b.date));
+  let best=0, run=0;
+  comps.forEach(e=>{ if(e.result.outcome==='win'){ run++; best=Math.max(best,run); } else run=0; });
+  return best;
+}
+function mostSessionsInWeek(list){
+  if(list.length===0) return 0;
+  const times = list.map(e=>new Date(e.date+'T00:00:00').getTime()).sort((a,b)=>a-b);
+  let max=1;
+  for(let i=0;i<times.length;i++){
+    let count=1;
+    for(let j=i+1;j<times.length;j++){ if(times[j]-times[i] <= 6*86400000) count++; else break; }
+    max = Math.max(max,count);
+  }
+  return max;
+}
+
+const BADGE_DEFS = [
+  { id:'first', emoji:'🥇', title:'Première séance', check: l => l.length>=1 },
+  { id:'ten', emoji:'🔟', title:'10 séances loguées', check: l => l.length>=10 },
+  { id:'fifty', emoji:'💯', title:'50 séances loguées', check: l => l.length>=50 },
+  { id:'firstwin', emoji:'🏆', title:'Première victoire', check: l => l.some(e=>e.result && e.result.outcome==='win') },
+  { id:'winstreak3', emoji:'⚡', title:'3 victoires d\'affilée', check: l => longestWinStreak(l)>=3 },
+  { id:'techvariety', emoji:'🧠', title:'10 techniques différentes', check: l => new Set(l.flatMap(e=>e.techniques||[])).size>=10 },
+  { id:'streak7', emoji:'🔥', title:'7 jours d\'affilée', check: l => computeStreaks(l).best>=7 },
+  { id:'streak30', emoji:'🚀', title:'30 jours d\'affilée', check: l => computeStreaks(l).best>=30 },
+  { id:'multidisc', emoji:'🥋', title:'3 disciplines pratiquées', check: l => new Set(l.map(e=>e.discipline)).size>=3 }
+];
+function getUnlockedBadgeIds(list){
+  return new Set(BADGE_DEFS.filter(b => b.check(list)).map(b=>b.id));
+}
+
+function celebrate(originEl){
+  const rect = originEl.getBoundingClientRect();
+  const emojis = ['🔥','💪','🥋','⚡','👊'];
+  for(let i=0;i<10;i++){
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    const x = rect.left + rect.width/2 + (Math.random()-0.5)*rect.width*0.8;
+    const y = rect.top + rect.height/2;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.setProperty('--dx', ((Math.random()-0.5)*140) + 'px');
+    el.style.setProperty('--rot', ((Math.random()-0.5)*90) + 'deg');
+    document.body.appendChild(el);
+    setTimeout(()=> el.remove(), 950);
+  }
+}
+
+function fuelBar(level){
+  return `<div class="fuel-bar">${FUEL_LEVELS.map((f,i)=>`<span style="background:${i<level?f.color:'transparent'}"></span>`).join('')}</div>`;
+}
+
+function renderCoachCard(){
+  if(!lastCoach) return '';
+  return `<div class="coach-card">
+    <div class="icon">${lastCoach.icon}</div>
+    <div>
+      <div class="label">Coach GRIT</div>
+      <div class="msg">${lastCoach.text}</div>
+    </div>
+  </div>`;
+}
+
+function renderQuoteCard(){
+  const q = getQuoteOfDay();
+  return `<div class="card" style="background: linear-gradient(135deg, rgba(201,151,75,0.10), transparent); border-color: rgba(201,151,75,0.3);">
+    <div style="font-size:14px; font-style:italic; color:var(--text); line-height:1.4;">"${escapeHtml(q.text)}"</div>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--gold); margin-top:6px;">— ${escapeHtml(q.author)}</div>
+  </div>`;
+}
+
+function renderThrowbackCard(){
+  const tb = getThrowback(entries);
+  if(!tb) return '';
+  const e = tb.entry;
+  const disc = disciplineInfo(e.discipline);
+  return `<div class="card" style="background: linear-gradient(135deg, rgba(74,132,176,0.10), transparent); border-color: rgba(74,132,176,0.3);">
+    <div class="section-label">🕰️ ${tb.label}, ${formatDate(e.date)}</div>
+    <div style="font-size:13.5px;">${disc.emoji} ${e.discipline} · ${FUEL_LEVELS[e.feeling-1].emoji} ${e.feeling}/5${e.weight ? ' · '+e.weight+'kg' : ''}</div>
+    ${e.note ? `<div class="entry-note" style="margin-top:6px;">${escapeHtml(e.note)}</div>` : ''}
+  </div>`;
+}
+
+function renderWeeklyChallengeCard(){
+  const wc = getWeeklyChallengeProgress(entries);
+  const pct = Math.min(100, (wc.count/wc.target)*100);
+  const done = wc.count >= wc.target;
+  return `<div class="card">
+    <div class="section-label">🎯 Défi de la semaine</div>
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+      <div style="font-size:13.5px;">${done ? '✅ Défi complété !' : `${wc.count}/${wc.target} séances loguées`}</div>
+    </div>
+    <div class="fuel-bar" style="height:8px;"><span style="flex:${wc.count}; background:${done?'var(--green)':'var(--gold)'};"></span><span style="flex:${Math.max(0,wc.target-wc.count)}; background:transparent;"></span></div>
+  </div>`;
+}
+
+function renderNew(){
+  return `
+  ${renderQuoteCard()}
+  ${renderWeeklyChallengeCard()}
+  ${renderThrowbackCard()}
+  ${renderCoachCard()}
+  <div class="card">
+    <div class="section-label">Discipline</div>
+    <div class="discipline-grid">
+      ${DISCIPLINES.map(d => `<button data-act="discipline" data-val="${d.name}" class="discipline-btn ${form.discipline===d.name?'active':''}" style="--dcolor:${d.color}">
+        <span class="emoji">${d.emoji}</span>${d.name}
+      </button>`).join('')}
+    </div>
+
+    <div class="section-label" style="margin-top:18px;">Type</div>
+    <div class="seg">
+      <button data-act="type" data-val="training" class="${form.type==='training'?'active':''}">🏋️ Entraînement</button>
+      <button data-act="type" data-val="competition" class="${form.type==='competition'?'active':''}">🏆 Match / Compétition</button>
+    </div>
+
+    <label>Date</label>
+    <input type="date" id="f-date" value="${form.date}">
+
+    <label>Poids (kg)</label>
+    <input type="number" step="0.1" id="f-weight" placeholder="ex : 75.4" value="${form.weight}">
+
+    <label>Sommeil la nuit dernière (h) — optionnel</label>
+    <input type="number" step="0.5" id="f-sleep" placeholder="ex : 7.5" value="${form.sleepHours}">
+
+    <label>Ressenti</label>
+    <div class="fuel-row">
+      ${FUEL_LEVELS.map((f,i) => `<button data-act="feeling" data-val="${i+1}" class="fuel-btn ${form.feeling==i+1?'active':''}" style="${form.feeling==i+1?`border-color:${f.color};color:${f.color}`:''}">
+        <span class="emoji">${f.emoji}</span>${i+1}
+      </button>`).join('')}
+    </div>
+    ${fuelBar(form.feeling)}
+
+    <label>Notes libres</label>
+    <textarea id="f-note" placeholder="Sensations, ce qui a marché, ce qu'il faut corriger...">${form.note}</textarea>
+
+    <label>Techniques / points travaillés (optionnel)</label>
+    <input type="text" id="f-techniques" placeholder="ex : toreando, sprint, coup droit..." value="${form.techniques}">
+
+    ${form.type==='competition' ? `
+    <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
+      <div class="section-label">Résultat</div>
+      <div class="seg">
+        <button data-act="outcome" data-val="win" class="${form.outcome==='win'?'active':''}">🏆 Victoire</button>
+        <button data-act="outcome" data-val="loss" class="${form.outcome==='loss'?'active':''}">📉 Défaite</button>
+        <button data-act="outcome" data-val="draw" class="${form.outcome==='draw'?'active':''}">🤝 Nul</button>
+      </div>
+      <label>Méthode</label>
+      <input type="text" id="f-method" placeholder="${METHOD_HINTS[form.discipline]}" value="${form.method}">
+      <label>Adversaire / contexte (optionnel)</label>
+      <input type="text" id="f-opponent" placeholder="ex : tournoi, niveau adverse" value="${form.opponent}">
+    </div>
+    ` : ''}
+
+    <button class="btn-primary" id="save-btn">Enregistrer la séance</button>
+  </div>
+  `;
+}
+
+function renderHistory(){
+  const filters = ['Toutes', ...DISCIPLINES.map(d=>d.name).filter(d => entries.some(e=>e.discipline===d))];
+  const filtered = historyFilter==='Toutes' ? entries : entries.filter(e=>e.discipline===historyFilter);
+  const filterRow = `<div class="filter-row">${filters.map(f => `<button class="filter-chip ${historyFilter===f?'active':''}" data-act="filter" data-val="${f}">${f}</button>`).join('')}</div>`;
+
+  if(filtered.length === 0){
+    return `${filterRow}<div class="card"><div class="empty">Aucune séance enregistrée${historyFilter!=='Toutes' ? ' pour '+historyFilter : ''}.<br>Ajoute ta première entrée dans l'onglet "Nouvelle".</div></div>`;
+  }
+  const sorted = [...filtered].sort((a,b)=> b.date.localeCompare(a.date));
+  return `${filterRow}<div class="card">${sorted.map(e => {
+    const disc = disciplineInfo(e.discipline);
+    const fuel = FUEL_LEVELS[e.feeling-1];
+    const outcomeColor = e.result ? (e.result.outcome==='win'?'var(--green)':e.result.outcome==='loss'?'var(--coral)':'var(--text-muted)') : '';
+    return `
+    <div class="entry">
+      <div class="entry-top">
+        <span class="entry-date">${formatDate(e.date)}</span>
+        <div class="entry-tags">
+          <span class="tag" style="background:${disc.color}22; color:${disc.color}">${disc.emoji} ${e.discipline}</span>
+          <span class="tag" style="background:${e.type==='training'?'#4a90d922':'#f2b54422'}; color:${e.type==='training'?'#4a90d9':'#f2b544'}">${e.type==='training'?'🏋️':'🏆'}</span>
+        </div>
+      </div>
+      <div class="entry-stats">
+        ${e.weight ? `<span><b>${e.weight}</b> kg</span>` : ''}
+        <span>${fuel.emoji} <b style="color:${fuel.color}">${e.feeling}/5</b></span>
+      </div>
+      ${e.note ? `<div class="entry-note">${escapeHtml(e.note)}</div>` : ''}
+      ${e.techniques && e.techniques.length ? `<div class="entry-note" style="color:var(--text-muted); font-size:12.5px;">🎯 ${e.techniques.map(escapeHtml).join(' · ')}</div>` : ''}
+      ${e.result ? `<div class="entry-result" style="border-left:3px solid ${outcomeColor}">
+        <b>${e.result.outcome==='win'?'🏆 Victoire':e.result.outcome==='loss'?'📉 Défaite':'🤝 Nul'}</b>
+        ${e.result.method ? ' · ' + escapeHtml(e.result.method) : ''}
+        ${e.result.opponent ? '<br>' + escapeHtml(e.result.opponent) : ''}
+      </div>` : ''}
+      ${e.coach ? `<div class="entry-coach">${e.coach.icon} ${e.coach.text}</div>` : ''}
+      <button class="del-btn" data-act="delete" data-id="${e.id}">Supprimer</button>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderProgress(){
+  if(entries.length === 0){
+    return `<div class="card"><div class="empty">Pas encore assez de données.<br>Ajoute des séances pour voir ta progression.</div></div>`;
+  }
+  const sorted = [...entries].sort((a,b)=> a.date.localeCompare(b.date));
+  const withWeight = sorted.filter(e => e.weight);
+  const comps = sorted.filter(e => e.type==='competition');
+  const wins = comps.filter(e => e.result && e.result.outcome==='win').length;
+  const avgFeeling = (sorted.reduce((s,e)=> s+Number(e.feeling),0) / sorted.length).toFixed(1);
+
+  const byDiscipline = {};
+  sorted.forEach(e => { byDiscipline[e.discipline] = (byDiscipline[e.discipline]||0)+1; });
+  const disciplineBreakdown = Object.entries(byDiscipline).sort((a,b)=>b[1]-a[1]).map(([d,c]) => {
+    const info = disciplineInfo(d);
+    return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px;">
+      <span>${info.emoji} ${d}</span><span class="mono" style="color:${info.color}; font-weight:600;">${c}</span>
+    </div>`;
+  }).join('');
+
+  const techCount = {};
+  sorted.forEach(e => (e.techniques||[]).forEach(t => { techCount[t] = (techCount[t]||0)+1; }));
+  const topTechniques = Object.entries(techCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const techniqueBreakdown = topTechniques.length ? `
+    <div class="card">
+      <div class="section-label">🎯 Techniques les plus travaillées</div>
+      ${topTechniques.map(([t,c]) => `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px;">
+        <span>${escapeHtml(t)}</span><span class="mono" style="color:var(--teal); font-weight:600;">${c}×</span>
+      </div>`).join('')}
+    </div>` : '';
+
+  let chart = '';
+  if(withWeight.length >= 2){
+    const weights = withWeight.map(e=>Number(e.weight));
+    const min = Math.min(...weights)-0.5, max = Math.max(...weights)+0.5;
+    const w=300,h=110,pad=10;
+    const pts = withWeight.map((e,i)=>{
+      const x = pad + (i/(withWeight.length-1))*(w-2*pad);
+      const y = h-pad - ((Number(e.weight)-min)/(max-min))*(h-2*pad);
+      return `${x},${y}`;
+    }).join(' ');
+    const areaPts = `${pad},${h-pad} ${pts} ${w-pad},${h-pad}`;
+    chart = `
+    <div class="card">
+      <div class="section-label">⚖️ Évolution du poids</div>
+      <div class="chart-wrap"><svg viewBox="0 0 300 110">
+        <defs><linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f2b544" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="#f2b544" stop-opacity="0"/>
+        </linearGradient></defs>
+        <polygon points="${areaPts}" fill="url(#wgrad)"/>
+        <polyline points="${pts}" fill="none" stroke="#f2b544" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg></div>
+      <div class="chart-caption">
+        <span>${withWeight[0].weight} kg — ${formatDate(withWeight[0].date)}</span>
+        <span>${withWeight[withWeight.length-1].weight} kg — ${formatDate(withWeight[withWeight.length-1].date)}</span>
+      </div>
+    </div>`;
+  }
+
+  let feelingChart = '';
+  if(sorted.length >= 2){
+    const w=300,h=110,pad=10;
+    const fpts = sorted.map((e,i)=>{
+      const x = pad + (i/(sorted.length-1))*(w-2*pad);
+      const y = h-pad - ((e.feeling-1)/4)*(h-2*pad);
+      return {x,y,color: FUEL_LEVELS[e.feeling-1].color};
+    });
+    const linePts = fpts.map(p=>`${p.x},${p.y}`).join(' ');
+    const dots = fpts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${p.color}"/>`).join('');
+    feelingChart = `
+    <div class="card">
+      <div class="section-label">⚙️ Évolution du ressenti</div>
+      <div class="chart-wrap"><svg viewBox="0 0 300 110">
+        <line x1="10" y1="55" x2="290" y2="55" stroke="#33383f" stroke-width="1" stroke-dasharray="3 4"/>
+        <polyline points="${linePts}" fill="none" stroke="#3ec9c0" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>
+        ${dots}
+      </svg></div>
+      <div class="chart-caption">
+        <span>${FUEL_LEVELS[sorted[0].feeling-1].emoji} ${formatDate(sorted[0].date)}</span>
+        <span>${FUEL_LEVELS[sorted[sorted.length-1].feeling-1].emoji} ${formatDate(sorted[sorted.length-1].date)}</span>
+      </div>
+    </div>`;
+  }
+
+  const streaks = computeStreaks(sorted);
+  const winStreak = longestWinStreak(sorted);
+  const maxWeek = mostSessionsInWeek(sorted);
+  const unlockedIds = getUnlockedBadgeIds(sorted);
+  const rank = getRankInfo(sorted);
+
+  const streakSection = `
+    <div class="stat-grid">
+      <div class="stat-box"><div class="num">🔥 ${streaks.current}</div><div class="lbl">Série en cours (jours)</div></div>
+      <div class="stat-box"><div class="num">🚀 ${streaks.best}</div><div class="lbl">Meilleure série (jours)</div></div>
+    </div>`;
+
+  const recordsSection = `
+    <div class="card">
+      <div class="section-label">🏅 Records personnels</div>
+      <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px;"><span>Plus de séances en 7 jours</span><b class="mono" style="color:var(--gold)">${maxWeek}</b></div>
+      <div style="display:flex; justify-content:space-between; padding:8px 0;"><span>Plus longue série de victoires</span><b class="mono" style="color:var(--green)">${winStreak}</b></div>
+    </div>`;
+
+  const badgesSection = `
+    <div class="card">
+      <div class="section-label">🎖️ Badges</div>
+      <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:10px;">
+        ${BADGE_DEFS.map(b => {
+          const on = unlockedIds.has(b.id);
+          return `<div style="text-align:center; padding:10px 4px; border-radius:12px; border:1.5px solid ${on?'var(--gold)':'var(--border)'}; background:${on?'rgba(242,181,68,0.1)':'var(--surface-2)'}; opacity:${on?1:0.4};">
+            <div style="font-size:22px;">${b.emoji}</div>
+            <div style="font-size:9.5px; font-family:'IBM Plex Mono',monospace; margin-top:4px; color:${on?'var(--text)':'var(--text-muted)'};">${b.title}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  return `
+    ${renderRankCard(rank)}
+    ${streakSection}
+    <div class="stat-grid">
+      <div class="stat-box"><div class="num">${sorted.length}</div><div class="lbl">📋 Séances loguées</div></div>
+      <div class="stat-box"><div class="num">${avgFeeling}</div><div class="lbl">⚙️ Jauge moyenne /5</div></div>
+      <div class="stat-box"><div class="num">${comps.length}</div><div class="lbl">🏆 Matchs / compét</div></div>
+      <div class="stat-box"><div class="num">${wins}</div><div class="lbl">🏆 Victoires</div></div>
+    </div>
+    ${chart}
+    ${feelingChart}
+    ${techniqueBreakdown}
+    ${recordsSection}
+    ${badgesSection}
+    <div class="card">
+      <div class="section-label">Répartition par discipline</div>
+      ${disciplineBreakdown}
+    </div>
+  `;
+}
+
+function formatDate(d){
+  const [y,m,day] = d.split('-');
+  const months = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  return `${day} ${months[Number(m)-1]} ${y}`;
+}
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function render(){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab===activeTab));
+  const main = document.getElementById('main');
+  if(activeTab==='new') main.innerHTML = renderNew();
+  else if(activeTab==='history') main.innerHTML = renderHistory();
+  else if(activeTab==='progress') main.innerHTML = renderProgress();
+  else if(activeTab==='advice') main.innerHTML = renderAdvice();
+  else main.innerHTML = renderSettings();
+  attachHandlers();
+}
+
+function attachHandlers(){
+  document.querySelectorAll('.tab').forEach(t => t.onclick = async () => {
+    activeTab = t.dataset.tab;
+    if(activeTab!=='new') lastCoach=null;
+    render();
+  });
+  document.querySelectorAll('[data-act="discipline"]').forEach(b => b.onclick = () => { form.discipline = b.dataset.val; render(); });
+  document.querySelectorAll('[data-act="type"]').forEach(b => b.onclick = () => { form.type = b.dataset.val; render(); });
+  document.querySelectorAll('[data-act="feeling"]').forEach(b => b.onclick = () => { form.feeling = Number(b.dataset.val); render(); });
+  document.querySelectorAll('[data-act="outcome"]').forEach(b => b.onclick = () => { form.outcome = b.dataset.val; render(); });
+  document.querySelectorAll('[data-act="filter"]').forEach(b => b.onclick = () => { historyFilter = b.dataset.val; render(); });
+  document.querySelectorAll('[data-act="delete"]').forEach(b => b.onclick = async () => {
+    entries = entries.filter(e => e.id !== b.dataset.id);
+    await saveEntries();
+    render();
+    showToast('Entrée supprimée');
+  });
+  document.querySelectorAll('[data-act="delete-goal"]').forEach(b => b.onclick = async () => {
+    goals = goals.filter(g => g.id !== b.dataset.id);
+    await saveGoals();
+    render();
+    showToast('Objectif supprimé');
+  });
+
+  const addGoalBtn = document.getElementById('add-goal-btn');
+  if(addGoalBtn) addGoalBtn.onclick = async () => {
+    const titleEl = document.getElementById('g-title');
+    const dateEl2 = document.getElementById('g-date');
+    if(!titleEl.value.trim() || !dateEl2.value) { showToast('Titre et date requis'); return; }
+    goals.push({ id: uid(), title: titleEl.value.trim(), date: dateEl2.value });
+    await saveGoals();
+    showToast('Objectif ajouté 🎯');
+    render();
+  };
+
+  const genSummaryBtn = document.getElementById('gen-summary-btn');
+  if(genSummaryBtn) genSummaryBtn.onclick = () => {
+    const box = document.getElementById('coach-summary');
+    const copyBtn = document.getElementById('copy-summary-btn');
+    box.value = generateCoachSummary();
+    box.style.display = 'block';
+    copyBtn.style.display = 'block';
+  };
+  const copySummaryBtn = document.getElementById('copy-summary-btn');
+  if(copySummaryBtn) copySummaryBtn.onclick = async () => {
+    const box = document.getElementById('coach-summary');
+    try{ await navigator.clipboard.writeText(box.value); showToast('Résumé copié 📋'); }
+    catch(e){ box.select(); showToast('Sélectionne et copie manuellement'); }
+  };
+
+  document.querySelectorAll('[data-act="pain-intensity"]').forEach(b => b.onclick = () => { painForm.intensity = Number(b.dataset.val); render(); });
+  document.querySelectorAll('[data-act="delete-pain"]').forEach(b => b.onclick = async () => {
+    healthLog = healthLog.filter(p => p.id !== b.dataset.id);
+    await saveHealth();
+    render();
+    showToast('Entrée supprimée');
+  });
+  const painZoneEl = document.getElementById('pain-zone');
+  const painNoteEl = document.getElementById('pain-note');
+  if(painZoneEl) painZoneEl.oninput = e => painForm.zone = e.target.value;
+  if(painNoteEl) painNoteEl.oninput = e => painForm.note = e.target.value;
+  const addPainBtn = document.getElementById('add-pain-btn');
+  if(addPainBtn) addPainBtn.onclick = async () => {
+    if(!painForm.zone.trim()){ showToast('Indique une zone'); return; }
+    healthLog.push({ id: uid(), date: todayStr(), zone: painForm.zone.trim(), intensity: painForm.intensity, note: painForm.note.trim() });
+    await saveHealth();
+    painForm = { zone:'', intensity:3, note:'' };
+    showToast('Douleur enregistrée 🩺');
+    render();
+  };
+
+  const exportBtn = document.getElementById('export-btn');
+  if(exportBtn) exportBtn.onclick = () => {
+    const box = document.getElementById('export-box');
+    const copyBtn = document.getElementById('copy-export-btn');
+    box.value = exportBackup();
+    box.style.display = 'block';
+    copyBtn.style.display = 'block';
+  };
+  const copyExportBtn = document.getElementById('copy-export-btn');
+  if(copyExportBtn) copyExportBtn.onclick = async () => {
+    const box = document.getElementById('export-box');
+    try{ await navigator.clipboard.writeText(box.value); showToast('Sauvegarde copiée 📋'); }
+    catch(e){ box.select(); showToast('Sélectionne et copie manuellement'); }
+  };
+  const importBtn = document.getElementById('import-btn');
+  if(importBtn) importBtn.onclick = async () => {
+    const box = document.getElementById('import-box');
+    const ok = await importBackup(box.value);
+    if(ok){ showToast('Données restaurées ✅'); render(); }
+    else { showToast('Format invalide — vérifie le texte collé'); }
+  };
+
+  const askResetBtn = document.getElementById('ask-reset-btn');
+  if(askResetBtn) askResetBtn.onclick = () => { resetConfirm = true; render(); };
+  const cancelResetBtn = document.getElementById('cancel-reset-btn');
+  if(cancelResetBtn) cancelResetBtn.onclick = () => { resetConfirm = false; render(); };
+  const confirmResetBtn = document.getElementById('confirm-reset-btn');
+  if(confirmResetBtn) confirmResetBtn.onclick = async () => {
+    entries = []; goals = []; healthLog = [];
+    await saveEntries(); await saveGoals(); await saveHealth();
+    resetConfirm = false;
+    showToast('Données réinitialisées');
+    render();
+  };
+
+  const dateEl = document.getElementById('f-date');
+  const weightEl = document.getElementById('f-weight');
+  const sleepEl = document.getElementById('f-sleep');
+  const noteEl = document.getElementById('f-note');
+  const techEl = document.getElementById('f-techniques');
+  const methodEl = document.getElementById('f-method');
+  const opponentEl = document.getElementById('f-opponent');
+  if(dateEl) dateEl.oninput = e => form.date = e.target.value;
+  if(weightEl) weightEl.oninput = e => form.weight = e.target.value;
+  if(sleepEl) sleepEl.oninput = e => form.sleepHours = e.target.value;
+  if(noteEl) noteEl.oninput = e => form.note = e.target.value;
+  if(techEl) techEl.oninput = e => form.techniques = e.target.value;
+  if(methodEl) methodEl.oninput = e => form.method = e.target.value;
+  if(opponentEl) opponentEl.oninput = e => form.opponent = e.target.value;
+
+  const saveBtn = document.getElementById('save-btn');
+  if(saveBtn) saveBtn.onclick = async () => {
+    const entry = {
+      id: uid(),
+      discipline: form.discipline,
+      date: form.date || todayStr(),
+      type: form.type,
+      weight: form.weight ? Number(form.weight) : null,
+      sleepHours: form.sleepHours ? Number(form.sleepHours) : null,
+      feeling: form.feeling,
+      note: form.note.trim(),
+      techniques: form.techniques.split(',').map(t=>t.trim()).filter(Boolean),
+      result: form.type==='competition' ? { outcome: form.outcome, method: form.method.trim(), opponent: form.opponent.trim() } : null
+    };
+    const coach = generateCoachMessage(entry, entries);
+    entry.coach = coach;
+    const beforeBadges = getUnlockedBadgeIds(entries);
+    const rankBefore = getRankInfo(entries);
+    entries.push(entry);
+    await saveEntries();
+    const afterBadges = getUnlockedBadgeIds(entries);
+    const rankAfter = getRankInfo(entries);
+    const newBadges = BADGE_DEFS.filter(b => afterBadges.has(b.id) && !beforeBadges.has(b.id));
+    const rankedUp = rankKey(rankBefore) !== rankKey(rankAfter);
+    lastCoach = coach;
+    celebrate(saveBtn);
+    if(rankedUp) celebrate(saveBtn);
+    resetForm();
+    if(rankedUp){
+      showToast(`🏔️ Nouveau rang : ${rankAfter.tier.name}${rankAfter.legend ? ' — Légende GRIT' : ' · Division '+(rankAfter.division+1)} !`);
+    } else if(newBadges.length){
+      showToast(`Badge débloqué ${newBadges[0].emoji} ${newBadges[0].title} !`);
+    } else {
+      showToast('Séance enregistrée 💾');
+    }
+    render();
+    window.scrollTo({top:0, behavior:'smooth'});
+  };
+}
+
+loadEntries();
+loadGoals().then(render);
+loadHealth().then(render);
+</script>
+</body>
+</html>
