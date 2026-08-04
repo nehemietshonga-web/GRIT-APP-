@@ -295,6 +295,22 @@
 </head>
 <body>
 
+<div id="consent-screen" style="display:none; position:fixed; inset:0; z-index:100; background:var(--bg); padding:24px 20px; overflow-y:auto;">
+  <div style="max-width:480px; margin:40px auto 0;">
+    <h1 class="display" style="font-size:32px; color:var(--gold); margin-bottom:16px;">Bienvenue dans GRIT</h1>
+    <p style="font-size:14px; line-height:1.6; color:var(--text);">
+      Tu testes une version bêta. Pour aider à améliorer l'app, ton usage (fréquence de séances, disciplines pratiquées, régularité, onglets consultés) sera visible par le créateur de GRIT.
+    </p>
+    <p style="font-size:14px; line-height:1.6; color:var(--green,#6fcf97); margin-top:12px;">
+      ✅ Tes notes personnelles, douleurs et poids restent strictement privés — jamais partagés.
+    </p>
+    <label style="margin-top:20px;">Ton prénom ou pseudo</label>
+    <input type="text" id="consent-pseudo-input" placeholder="ex : Nems">
+    <button class="btn-primary" id="consent-accept-btn">J'accepte et je continue</button>
+    <div style="font-size:11px; color:var(--text-muted); margin-top:14px; text-align:center;">Tu peux arrêter d'utiliser l'app à tout moment — rien n'est obligatoire.</div>
+  </div>
+</div>
+
 <div class="bg-figures">
   <svg viewBox="0 0 100 100" width="220" height="220" style="top:60px; right:-40px;">
     <g fill="#eae7de">
@@ -346,6 +362,32 @@
 const STORAGE_KEY = 'grit-entries';
 const GOALS_KEY = 'grit-goals';
 const HEALTH_KEY = 'grit-health';
+
+// ---- Suivi d'usage (opt-in) — remplis avec tes identifiants Supabase ----
+const SUPABASE_URL = 'https://scexqhoojtxlduahbtkc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjZXhxaG9vanR4bGR1YWhidGtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzM1MzcsImV4cCI6MjEwMTM0OTUzN30.7p2OavkjniFZc3DkkhJSeYqydL0rWpn8EhlJhlePjDQ';
+const CONSENT_KEY = 'grit-consent-pseudo';
+
+async function trackEvent(eventType, payload){
+  const consentPseudo = localStorage.getItem(CONSENT_KEY);
+  if(!consentPseudo) return; // pas de consentement = pas de suivi, jamais
+  if(SUPABASE_URL.includes('TON-PROJET')) return; // pas encore configuré
+  try{
+    await fetch(`${SUPABASE_URL}/rest/v1/grit_events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        pseudo: consentPseudo,
+        event_type: eventType,
+        ...payload
+      })
+    });
+  }catch(e){ /* silencieux — le suivi ne doit jamais bloquer l'usage de l'app */ }
+}
 const DISCIPLINES = [
   {name:'BJJ', emoji:'🥋', color:'#4a90d9'},
   {name:'MMA', emoji:'🥊', color:'#ff5a45'},
@@ -1207,6 +1249,7 @@ function attachHandlers(){
     activeTab = t.dataset.tab;
     if(activeTab!=='new') lastCoach=null;
     render();
+    trackEvent('tab_view', { tab: activeTab });
   });
   document.querySelectorAll('[data-act="discipline"]').forEach(b => b.onclick = () => { form.discipline = b.dataset.val; render(); });
   document.querySelectorAll('[data-act="type"]').forEach(b => b.onclick = () => { form.type = b.dataset.val; render(); });
@@ -1343,6 +1386,7 @@ function attachHandlers(){
     const rankBefore = getRankInfo(entries);
     entries.push(entry);
     await saveEntries();
+    trackEvent('session_logged', { discipline: entry.discipline, type: entry.type, feeling: entry.feeling });
     const afterBadges = getUnlockedBadgeIds(entries);
     const rankAfter = getRankInfo(entries);
     const newBadges = BADGE_DEFS.filter(b => afterBadges.has(b.id) && !beforeBadges.has(b.id));
@@ -1363,9 +1407,31 @@ function attachHandlers(){
   };
 }
 
-loadEntries();
-loadGoals().then(render);
-loadHealth().then(render);
+function initConsentGate(){
+  const existing = localStorage.getItem(CONSENT_KEY);
+  if(existing){
+    startApp();
+    return;
+  }
+  document.getElementById('consent-screen').style.display = 'block';
+  document.getElementById('consent-accept-btn').onclick = () => {
+    const input = document.getElementById('consent-pseudo-input');
+    const val = input.value.trim();
+    if(!val){ input.style.outline = '2px solid var(--coral)'; return; }
+    localStorage.setItem(CONSENT_KEY, val);
+    document.getElementById('consent-screen').style.display = 'none';
+    startApp();
+    trackEvent('consent_given', {});
+  };
+}
+function startApp(){
+  loadEntries();
+  loadGoals().then(render);
+  loadHealth().then(render);
+  trackEvent('session_start', {});
+}
+
+initConsentGate();
 </script>
 </body>
 </html>
