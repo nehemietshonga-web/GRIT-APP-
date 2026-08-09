@@ -1,0 +1,19 @@
+{
+  "name": "GRIT",
+  "short_name": "GRIT",
+  "description": "Train · Track · Grind",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fff6ee",
+  "theme_color": "#e5383b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
