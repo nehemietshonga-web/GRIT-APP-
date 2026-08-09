@@ -360,7 +360,13 @@
 
 <div class="toast" id="toast"></div>
 
-<script>
+<script><script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js");
+    });
+  }
+</script>
 const STORAGE_KEY = 'grit-entries';
 const GOALS_KEY = 'grit-goals';
 const HEALTH_KEY = 'grit-health';
