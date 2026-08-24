@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head><link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#e5383b">
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>GRIT</title>
@@ -364,6 +363,7 @@
 const STORAGE_KEY = 'grit-entries';
 const GOALS_KEY = 'grit-goals';
 const HEALTH_KEY = 'grit-health';
+const NUTRITION_KEY = 'grit-nutrition';
 
 // ---- Suivi d'usage (opt-in) — remplis avec tes identifiants Supabase ----
 const SUPABASE_URL = 'https://scexqhoojtxlduahbtkc.supabase.co';
@@ -418,6 +418,23 @@ const METHOD_HINTS = {
   'Cyclisme': 'ex : distance, temps, dénivelé',
   'Autre': 'ex : méthode ou résultat'
 };
+const EXERCISE_LIBRARY = {
+  'BJJ': ['Garde fermée','Garde papillon','Passage de garde','Étranglement','Clé de bras','Montée en mount','Balayage','Prise de dos','Toreando','Défense'],
+  'MMA': ['Striking debout','Takedown','Ground and pound','Clinch','Sprawl','Soumission','Cardio/conditionnement','Défense de takedown'],
+  'Judo': ['Uchi-mata','O-goshi','Seoi-nage','Ne-waza','Randori','Ukemi (chutes)','Kumi-kata (saisie)'],
+  'Boxe': ['Jab','Direct','Crochet','Uppercut','Esquive','Sac de frappe','Sparring','Jeu de jambes'],
+  'Muay Thaï': ['Low kick','Genou','Coude','Clinch','Sac lourd','Sparring','Combos pieds-poings'],
+  'Lutte': ['Double jambe','Simple jambe','Renversement','Contrôle au sol','Sprawl','Randori'],
+  'Karaté': ['Kata','Kumite','Coups de poing','Coups de pied','Déplacements','Défense'],
+  'Football': ['Passes','Tirs au but','Dribble','Contrôle de balle','Jeu de tête','Défense','Match/scrimmage'],
+  'Course': ['Fractionné','Endurance fondamentale','Côtes','Sprint','Récupération active'],
+  'Musculation': ['Squat','Développé couché','Soulevé de terre','Traction','Développé militaire','Circuit training'],
+  'Natation': ['Crawl','Dos crawlé','Brasse','Papillon','Fractionné nage','Technique de virage'],
+  'Basketball': ['Tirs','Dribble','Passes','Défense','Match/scrimmage','Rebonds'],
+  'Tennis': ['Coup droit','Revers','Service','Volée','Jeu de jambes','Match'],
+  'Cyclisme': ['Sortie longue','Fractionné','Côtes','Sprint','Récupération'],
+  'Autre': []
+};
 const FUEL_LEVELS = [
   { emoji:'😣', label:'Épuisé', color:'#e2532d' },
   { emoji:'😕', label:'Bas', color:'#d97a3f' },
@@ -429,13 +446,15 @@ const FUEL_LEVELS = [
 let entries = [];
 let goals = [];
 let healthLog = [];
+let nutritionLog = [];
+let nutritionForm = { notes:'', hydration:'', digestion:'Bien' };
 let painForm = { zone: '', intensity: 3, note: '' };
 let resetConfirm = false;
 let activeTab = 'new';
 let historyFilter = 'Toutes';
 let lastCoach = null;
 let goalForm = { title: '', date: '' };
-let form = { discipline: 'BJJ', type: 'training', date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '', techniques: '', outcome: 'win', method: '', opponent: '' };
+let form = { discipline: 'BJJ', type: 'training', date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '', techniques: [], customTechnique: '', outcome: 'win', method: '', opponent: '' };
 
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -459,7 +478,7 @@ function showToast(msg){
 }
 function resetForm(){
   const disc = form.discipline;
-  form = { discipline: disc, type: 'training', date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '', techniques: '', outcome: 'win', method: '', opponent: '' };
+  form = { discipline: disc, type: 'training', date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '', techniques: [], customTechnique: '', outcome: 'win', method: '', opponent: '' };
 }
 
 async function loadHealth(){
@@ -470,6 +489,16 @@ async function loadHealth(){
 }
 async function saveHealth(){
   try{ localStorage.setItem(HEALTH_KEY, JSON.stringify(healthLog)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+async function loadNutrition(){
+  try{
+    const v = localStorage.getItem(NUTRITION_KEY);
+    nutritionLog = v ? JSON.parse(v) : [];
+  }catch(e){ nutritionLog = []; }
+}
+async function saveNutrition(){
+  try{ localStorage.setItem(NUTRITION_KEY, JSON.stringify(nutritionLog)); }
   catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
 }
 function weightCutAlert(list){
@@ -658,18 +687,49 @@ function generateCoachSummary(){
   const comps = set.filter(e=>e.type==='competition');
   const wins = comps.filter(e=>e.result && e.result.outcome==='win').length;
   const techCount = {};
-  set.forEach(e => (e.techniques||[]).forEach(t => { techCount[t]=(techCount[t]||0)+1; }));
+  set.forEach(e => (e.techniques||[]).forEach(t => { techCount[t.name]=(techCount[t.name]||0)+1; }));
   const topTech = Object.entries(techCount).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([t])=>t);
   const discSet = [...new Set(set.map(e=>e.discipline))];
 
+  const recentNutrition = nutritionLog.filter(n => daysSince(n.date) <= 7);
+  const recentPain = healthLog.filter(p => daysSince(p.date) <= 14);
+  const analysis = generateAnalysis(sorted.slice().reverse());
+
   let lines = [];
-  lines.push(`Résumé GRIT — ${set.length} séance(s) sur les 7 derniers jours`);
+  lines.push(`═══ RÉSUMÉ GRIT ═══`);
+  lines.push(`Période : ${set.length} séance(s) sur les 7 derniers jours`);
+  lines.push(``);
+  lines.push(`📋 ENTRAÎNEMENT`);
   lines.push(`Disciplines : ${discSet.join(', ')}`);
   lines.push(`Jauge moyenne de ressenti : ${avgFeeling}/5`);
   if(comps.length) lines.push(`Sparrings/combats : ${comps.length} (${wins} victoire(s))`);
   if(topTech.length) lines.push(`Techniques travaillées : ${topTech.join(', ')}`);
   const lastNote = set.find(e=>e.note);
   if(lastNote) lines.push(`Dernière note : "${lastNote.note}"`);
+
+  if(recentNutrition.length){
+    lines.push(``);
+    lines.push(`🍽️ NUTRITION (7 derniers jours)`);
+    lines.push(`${recentNutrition.length} repas loggé(s)`);
+    const avgHydration = recentNutrition.filter(n=>n.hydration).length
+      ? (recentNutrition.filter(n=>n.hydration).reduce((s,n)=>s+n.hydration,0)/recentNutrition.filter(n=>n.hydration).length).toFixed(1)
+      : null;
+    if(avgHydration) lines.push(`Hydratation moyenne : ${avgHydration}L/jour`);
+  }
+
+  if(recentPain.length){
+    lines.push(``);
+    lines.push(`🩺 SANTÉ (14 derniers jours)`);
+    const zones = [...new Set(recentPain.map(p=>p.zone))];
+    lines.push(`Gênes signalées : ${zones.join(', ')}`);
+  }
+
+  if(analysis.length){
+    lines.push(``);
+    lines.push(`🔬 ANALYSE`);
+    analysis.forEach(a => lines.push(`• ${a.text}`));
+  }
+
   return lines.join('\n');
 }
 
@@ -730,6 +790,18 @@ function renderAdvice(){
     </div>
   `).join('') : `<div class="empty" style="padding:16px 0;">Aucune douleur loguée. Tant mieux ! 💪</div>`;
 
+  const nutritionRows = nutritionLog.length ? [...nutritionLog].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8).map(n => `
+    <div class="entry">
+      <div class="entry-top">
+        <span class="entry-date">${formatDate(n.date)}</span>
+        ${n.hydration ? `<span class="tag" style="background:#3ec9c022; color:var(--teal)">💧 ${n.hydration}L</span>` : ''}
+      </div>
+      ${n.digestion ? `<div style="font-size:12.5px; color:var(--text-muted);">Digestion : ${escapeHtml(n.digestion)}</div>` : ''}
+      ${n.notes ? `<div class="entry-note">${escapeHtml(n.notes)}</div>` : ''}
+      <button class="del-btn" data-act="delete-nutrition" data-id="${n.id}">Supprimer</button>
+    </div>
+  `).join('') : `<div class="empty" style="padding:16px 0;">Aucun repas loggé encore.</div>`;
+
   const recurring = recurringPainZones(healthLog);
   const recurringBanner = recurring.length ? `
     <div class="reminder-banner">
@@ -764,6 +836,36 @@ function renderAdvice(){
       <button class="btn-secondary" id="add-pain-btn" style="border-color:var(--coral); color:var(--coral); background:rgba(255,90,69,0.08);">+ Ajouter la douleur</button>
       <div style="margin-top:16px;">${painRows}</div>
       <div style="font-size:11px; color:var(--text-muted); margin-top:12px; opacity:0.8;">Ceci n'est pas un avis médical. En cas de douleur persistante ou inquiétante, consulte un professionnel de santé.</div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">🧊 Premiers soins — principes généraux</div>
+      <div class="tip-item"><div class="icon">🛌</div><div class="body"><b>Repos</b> — arrête l'activité qui aggrave la douleur, le temps nécessaire dépend entièrement de la blessure et de la personne.</div></div>
+      <div class="tip-item"><div class="icon">🧊</div><div class="body"><b>Glace</b> — 15-20 min, plusieurs fois par jour les premières 48h, sur une blessure aiguë.</div></div>
+      <div class="tip-item"><div class="icon">🩹</div><div class="body"><b>Compression</b> — un bandage souple peut limiter le gonflement, sans serrer excessivement.</div></div>
+      <div class="tip-item"><div class="icon">⬆️</div><div class="body"><b>Élévation</b> — surélève la zone blessée quand c'est possible.</div></div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:10px; opacity:0.8;">⚠️ Aucune durée de reprise ne peut être donnée sans évaluation par un professionnel — chaque blessure est différente. Consulte un médecin ou kiné pour un vrai diagnostic et un plan de reprise.</div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">🍽️ Nutrition</div>
+      <div class="stat-grid" style="margin-bottom:12px;">
+        <div class="stat-box"><div class="num">${nutritionLog.length}</div><div class="lbl">📋 Repas loggés</div></div>
+        <div class="stat-box"><div class="num">${nutritionLog.length && nutritionLog[nutritionLog.length-1].hydration ? nutritionLog[nutritionLog.length-1].hydration : '—'}</div><div class="lbl">💧 Dernière hydratation (L)</div></div>
+      </div>
+      <label>Alimentation du jour</label>
+      <textarea id="nutrition-notes" placeholder="ex : petit-déj léger, bon appétit le midi, repas post-training...">${escapeHtml(nutritionForm.notes)}</textarea>
+      <label>Hydratation (L)</label>
+      <input type="number" step="0.1" id="nutrition-hydration" value="${nutritionForm.hydration}">
+      <label>Digestion</label>
+      <div class="seg">
+        <button data-act="nutrition-digestion" data-val="Bien" class="${nutritionForm.digestion==='Bien'?'active':''}">🙂 Bien</button>
+        <button data-act="nutrition-digestion" data-val="Moyen" class="${nutritionForm.digestion==='Moyen'?'active':''}">😐 Moyen</button>
+        <button data-act="nutrition-digestion" data-val="Difficile" class="${nutritionForm.digestion==='Difficile'?'active':''}">😣 Difficile</button>
+      </div>
+      <button class="btn-secondary" id="add-nutrition-btn" style="border-color:var(--teal); color:var(--teal); background:rgba(63,157,148,0.08);">+ Ajouter</button>
+      <div style="margin-top:16px;">${nutritionRows}</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:12px; opacity:0.8;">Journal libre, sans objectif chiffré — pour repérer tes habitudes, pas pour restreindre.</div>
     </div>`;
 
   return `
@@ -911,7 +1013,7 @@ const BADGE_DEFS = [
   { id:'fifty', emoji:'💯', title:'50 séances loguées', check: l => l.length>=50 },
   { id:'firstwin', emoji:'🏆', title:'Première victoire', check: l => l.some(e=>e.result && e.result.outcome==='win') },
   { id:'winstreak3', emoji:'⚡', title:'3 victoires d\'affilée', check: l => longestWinStreak(l)>=3 },
-  { id:'techvariety', emoji:'🧠', title:'10 techniques différentes', check: l => new Set(l.flatMap(e=>e.techniques||[])).size>=10 },
+  { id:'techvariety', emoji:'🧠', title:'10 techniques différentes', check: l => new Set(l.flatMap(e=>(e.techniques||[]).map(t=>t.name))).size>=10 },
   { id:'streak7', emoji:'🔥', title:'7 jours d\'affilée', check: l => computeStreaks(l).best>=7 },
   { id:'streak30', emoji:'🚀', title:'30 jours d\'affilée', check: l => computeStreaks(l).best>=30 },
   { id:'multidisc', emoji:'🥋', title:'3 disciplines pratiquées', check: l => new Set(l.map(e=>e.discipline)).size>=3 }
@@ -1026,8 +1128,30 @@ function renderNew(){
     <label>Notes libres</label>
     <textarea id="f-note" placeholder="Sensations, ce qui a marché, ce qu'il faut corriger...">${form.note}</textarea>
 
-    <label>Techniques / points travaillés (optionnel)</label>
-    <input type="text" id="f-techniques" placeholder="ex : toreando, sprint, coup droit..." value="${form.techniques}">
+    <label>Techniques / exercices travaillés (optionnel)</label>
+    ${EXERCISE_LIBRARY[form.discipline] && EXERCISE_LIBRARY[form.discipline].length ? `
+    <div class="check-row" style="display:flex; flex-wrap:wrap; gap:7px; margin-bottom:10px;">
+      ${EXERCISE_LIBRARY[form.discipline].map(name => {
+        const selected = form.techniques.some(t=>t.name===name);
+        return `<span data-act="toggle-technique" data-name="${escapeHtml(name)}" style="padding:8px 12px; border-radius:20px; border:1.5px solid ${selected?'var(--coral)':'var(--border)'}; background:${selected?'rgba(229,56,59,0.08)':'var(--surface-2)'}; color:${selected?'var(--coral)':'var(--text-muted)'}; font-size:12.5px; cursor:pointer; display:inline-block;">${escapeHtml(name)}</span>`;
+      }).join('')}
+    </div>` : ''}
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <input type="text" id="f-custom-technique" placeholder="Ajouter une technique perso..." value="${escapeHtml(form.customTechnique)}" style="flex:1;">
+      <button class="btn-secondary" id="add-custom-technique-btn" style="margin-top:0; width:auto; padding:0 16px;">+</button>
+    </div>
+    ${form.techniques.length ? `
+    <div style="margin-bottom:6px;">
+      ${form.techniques.map((t,i) => `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--border);">
+          <span style="font-size:13px; flex:1;">${escapeHtml(t.name)}</span>
+          <div style="display:flex; gap:4px;">
+            ${FUEL_LEVELS.map((f,fi) => `<span data-act="technique-feeling" data-index="${i}" data-val="${fi+1}" style="font-size:15px; cursor:pointer; opacity:${t.feeling===fi+1?1:0.3};">${f.emoji}</span>`).join('')}
+          </div>
+          <span data-act="remove-technique" data-index="${i}" style="color:var(--text-muted); cursor:pointer; font-size:14px;">✕</span>
+        </div>
+      `).join('')}
+    </div>` : ''}
 
     ${form.type==='competition' ? `
     <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
@@ -1076,7 +1200,7 @@ function renderHistory(){
         <span>${fuel.emoji} <b style="color:${fuel.color}">${e.feeling}/5</b></span>
       </div>
       ${e.note ? `<div class="entry-note">${escapeHtml(e.note)}</div>` : ''}
-      ${e.techniques && e.techniques.length ? `<div class="entry-note" style="color:var(--text-muted); font-size:12.5px;">🎯 ${e.techniques.map(escapeHtml).join(' · ')}</div>` : ''}
+      ${e.techniques && e.techniques.length ? `<div class="entry-note" style="color:var(--text-muted); font-size:12.5px;">🎯 ${e.techniques.map(t=>`${escapeHtml(t.name)} ${FUEL_LEVELS[t.feeling-1]?FUEL_LEVELS[t.feeling-1].emoji:''}`).join(' · ')}</div>` : ''}
       ${e.result ? `<div class="entry-result" style="border-left:3px solid ${outcomeColor}">
         <b>${e.result.outcome==='win'?'🏆 Victoire':e.result.outcome==='loss'?'📉 Défaite':'🤝 Nul'}</b>
         ${e.result.method ? ' · ' + escapeHtml(e.result.method) : ''}
@@ -1086,6 +1210,98 @@ function renderHistory(){
       <button class="del-btn" data-act="delete" data-id="${e.id}">Supprimer</button>
     </div>`;
   }).join('')}</div>`;
+}
+
+// ---- Analyse poussée : insights calculés sur les vraies données, pas de texte générique ----
+function generateAnalysis(sorted){
+  const insights = [];
+  if(sorted.length < 5) return insights;
+
+  // 1. Tendance récente du ressenti (14 derniers jours vs 14 précédents)
+  const recent = sorted.filter(e => daysSince(e.date) <= 14);
+  const prior = sorted.filter(e => daysSince(e.date) > 14 && daysSince(e.date) <= 28);
+  if(recent.length >= 2 && prior.length >= 2){
+    const avgRecent = recent.reduce((s,e)=>s+e.feeling,0)/recent.length;
+    const avgPrior = prior.reduce((s,e)=>s+e.feeling,0)/prior.length;
+    const diff = avgRecent - avgPrior;
+    if(Math.abs(diff) >= 0.4){
+      insights.push({
+        icon: diff>0 ? '📈' : '📉',
+        text: diff>0
+          ? `Ta jauge moyenne a progressé de ${diff.toFixed(1)} point sur les 2 dernières semaines (${avgPrior.toFixed(1)} → ${avgRecent.toFixed(1)}) — bonne dynamique, continue comme ça.`
+          : `Ta jauge moyenne a baissé de ${Math.abs(diff).toFixed(1)} point sur les 2 dernières semaines (${avgPrior.toFixed(1)} → ${avgRecent.toFixed(1)}) — vaut le coup de surveiller ta récupération.`
+      });
+    }
+  }
+
+  // 2. Jour de la semaine le plus dur
+  const byWeekday = {};
+  sorted.forEach(e => {
+    const wd = new Date(e.date+'T00:00:00').getDay();
+    if(!byWeekday[wd]) byWeekday[wd] = [];
+    byWeekday[wd].push(e.feeling);
+  });
+  const weekdayNames = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const weekdayAvgs = Object.entries(byWeekday).filter(([,v])=>v.length>=2).map(([wd,v])=>({wd:Number(wd), avg: v.reduce((a,b)=>a+b,0)/v.length}));
+  if(weekdayAvgs.length >= 3){
+    const worst = weekdayAvgs.sort((a,b)=>a.avg-b.avg)[0];
+    const overallAvg = sorted.reduce((s,e)=>s+e.feeling,0)/sorted.length;
+    if(worst.avg <= overallAvg - 0.5){
+      insights.push({ icon:'📅', text: `Tes séances du ${weekdayNames[worst.wd]} ont tendance à être plus dures (jauge moyenne ${worst.avg.toFixed(1)}/5, contre ${overallAvg.toFixed(1)}/5 en moyenne) — peut-être un jour à alléger.` });
+    }
+  }
+
+  // 3. Discipline la plus exigeante
+  const byDiscAvg = {};
+  sorted.forEach(e => { if(!byDiscAvg[e.discipline]) byDiscAvg[e.discipline]=[]; byDiscAvg[e.discipline].push(e.feeling); });
+  const discEntries = Object.entries(byDiscAvg).filter(([,v])=>v.length>=3);
+  if(discEntries.length >= 2){
+    const discAvgs = discEntries.map(([d,v])=>({d, avg: v.reduce((a,b)=>a+b,0)/v.length}));
+    const hardest = discAvgs.sort((a,b)=>a.avg-b.avg)[0];
+    insights.push({ icon: disciplineInfo(hardest.d).emoji, text: `${hardest.d} semble être ta discipline la plus exigeante en ce moment (jauge moyenne ${hardest.avg.toFixed(1)}/5).` });
+  }
+
+  // 4. Tendance du poids
+  const withWeight = sorted.filter(e=>e.weight);
+  if(withWeight.length >= 4){
+    const first = withWeight[0], last = withWeight[withWeight.length-1];
+    const days = Math.max(1, daysSince(first.date) - daysSince(last.date));
+    const rate = ((last.weight - first.weight) / days) * 7;
+    if(Math.abs(rate) >= 0.15){
+      insights.push({ icon:'⚖️', text: `Ton poids évolue d'environ ${rate>0?'+':''}${rate.toFixed(2)} kg/semaine sur la période couverte (${first.weight}kg → ${last.weight}kg).` });
+    }
+  }
+
+  // 5. Lien sommeil / ressenti
+  const withSleep = sorted.filter(e=>e.sleepHours);
+  if(withSleep.length >= 6){
+    const lowSleep = withSleep.filter(e=>e.sleepHours < 7);
+    const goodSleep = withSleep.filter(e=>e.sleepHours >= 7);
+    if(lowSleep.length >= 2 && goodSleep.length >= 2){
+      const avgLow = lowSleep.reduce((s,e)=>s+e.feeling,0)/lowSleep.length;
+      const avgGood = goodSleep.reduce((s,e)=>s+e.feeling,0)/goodSleep.length;
+      if(avgGood - avgLow >= 0.4){
+        insights.push({ icon:'😴', text: `Tes séances après une nuit de 7h+ ont une jauge moyenne de ${avgGood.toFixed(1)}/5, contre ${avgLow.toFixed(1)}/5 après moins de 7h — le sommeil compte visiblement beaucoup pour toi.` });
+      }
+    }
+  }
+
+  // 6. Technique la plus dure
+  const techStats2 = {};
+  sorted.forEach(e => (e.techniques||[]).forEach(t => {
+    if(!techStats2[t.name]) techStats2[t.name] = [];
+    if(t.feeling) techStats2[t.name].push(t.feeling);
+  }));
+  const techEntries = Object.entries(techStats2).filter(([,v])=>v.length>=3);
+  if(techEntries.length){
+    const techAvgs = techEntries.map(([n,v])=>({n, avg: v.reduce((a,b)=>a+b,0)/v.length}));
+    const hardestTech = techAvgs.sort((a,b)=>a.avg-b.avg)[0];
+    if(hardestTech.avg <= 2.8){
+      insights.push({ icon:'🎯', text: `"${hardestTech.n}" ressort comme une technique qui te coûte particulièrement (ressenti moyen ${hardestTech.avg.toFixed(1)}/5) — peut-être un point à travailler avec ton coach.` });
+    }
+  }
+
+  return insights;
 }
 
 function renderProgress(){
@@ -1107,15 +1323,27 @@ function renderProgress(){
     </div>`;
   }).join('');
 
-  const techCount = {};
-  sorted.forEach(e => (e.techniques||[]).forEach(t => { techCount[t] = (techCount[t]||0)+1; }));
-  const topTechniques = Object.entries(techCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const techStats = {};
+  sorted.forEach(e => (e.techniques||[]).forEach(t => {
+    if(!techStats[t.name]) techStats[t.name] = { count:0, feelingSum:0, feelingCount:0 };
+    techStats[t.name].count++;
+    if(t.feeling){ techStats[t.name].feelingSum += t.feeling; techStats[t.name].feelingCount++; }
+  }));
+  const topTechniques = Object.entries(techStats).sort((a,b)=>b[1].count-a[1].count).slice(0,8);
   const techniqueBreakdown = topTechniques.length ? `
     <div class="card">
       <div class="section-label">🎯 Techniques les plus travaillées</div>
-      ${topTechniques.map(([t,c]) => `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px;">
-        <span>${escapeHtml(t)}</span><span class="mono" style="color:var(--teal); font-weight:600;">${c}×</span>
-      </div>`).join('')}
+      ${topTechniques.map(([name,s]) => {
+        const avg = s.feelingCount ? (s.feelingSum/s.feelingCount) : null;
+        const avgIdx = avg ? Math.round(avg)-1 : null;
+        return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px;">
+        <span>${escapeHtml(name)}</span>
+        <span style="display:flex; align-items:center; gap:8px;">
+          ${avgIdx!==null ? `<span title="ressenti moyen" style="font-size:14px;">${FUEL_LEVELS[avgIdx].emoji}</span>` : ''}
+          <span class="mono" style="color:var(--teal); font-weight:600;">${s.count}×</span>
+        </span>
+      </div>`;
+      }).join('')}
     </div>` : '';
 
   let chart = '';
@@ -1205,6 +1433,17 @@ function renderProgress(){
       </div>
     </div>`;
 
+  const analysis = generateAnalysis(sorted);
+  const analysisSection = analysis.length ? `
+    <div class="card" style="background:linear-gradient(135deg, rgba(155,127,212,0.10), transparent); border-color:rgba(155,127,212,0.3);">
+      <div class="section-label">🔬 Analyse poussée</div>
+      ${analysis.map(a => `<div class="tip-item"><div class="icon">${a.icon}</div><div class="body">${a.text}</div></div>`).join('')}
+    </div>` : `
+    <div class="card">
+      <div class="section-label">🔬 Analyse poussée</div>
+      <div style="font-size:13px; color:var(--text-muted);">Pas encore assez de données pour une analyse fiable — reviens ici après quelques séances de plus.</div>
+    </div>`;
+
   return `
     ${renderRankCard(rank)}
     ${streakSection}
@@ -1216,6 +1455,7 @@ function renderProgress(){
     </div>
     ${chart}
     ${feelingChart}
+    ${analysisSection}
     ${techniqueBreakdown}
     ${recordsSection}
     ${badgesSection}
@@ -1318,6 +1558,27 @@ function attachHandlers(){
     render();
   };
 
+  const nutritionNotesEl = document.getElementById('nutrition-notes');
+  const nutritionHydrationEl = document.getElementById('nutrition-hydration');
+  if(nutritionNotesEl) nutritionNotesEl.oninput = e => nutritionForm.notes = e.target.value;
+  if(nutritionHydrationEl) nutritionHydrationEl.oninput = e => nutritionForm.hydration = e.target.value;
+  document.querySelectorAll('[data-act="nutrition-digestion"]').forEach(b => b.onclick = () => { nutritionForm.digestion = b.dataset.val; render(); });
+  document.querySelectorAll('[data-act="delete-nutrition"]').forEach(b => b.onclick = async () => {
+    nutritionLog = nutritionLog.filter(n => n.id !== b.dataset.id);
+    await saveNutrition();
+    render();
+    showToast('Entrée supprimée');
+  });
+  const addNutritionBtn = document.getElementById('add-nutrition-btn');
+  if(addNutritionBtn) addNutritionBtn.onclick = async () => {
+    if(!nutritionForm.notes.trim() && !nutritionForm.hydration){ showToast('Ajoute au moins une note ou une hydratation'); return; }
+    nutritionLog.push({ id: uid(), date: todayStr(), notes: nutritionForm.notes.trim(), hydration: nutritionForm.hydration ? Number(nutritionForm.hydration) : null, digestion: nutritionForm.digestion });
+    await saveNutrition();
+    nutritionForm = { notes:'', hydration:'', digestion:'Bien' };
+    showToast('Repas enregistré 🍽️');
+    render();
+  };
+
   const exportBtn = document.getElementById('export-btn');
   if(exportBtn) exportBtn.onclick = () => {
     const box = document.getElementById('export-box');
@@ -1357,16 +1618,40 @@ function attachHandlers(){
   const weightEl = document.getElementById('f-weight');
   const sleepEl = document.getElementById('f-sleep');
   const noteEl = document.getElementById('f-note');
-  const techEl = document.getElementById('f-techniques');
+  const customTechEl = document.getElementById('f-custom-technique');
   const methodEl = document.getElementById('f-method');
   const opponentEl = document.getElementById('f-opponent');
   if(dateEl) dateEl.oninput = e => form.date = e.target.value;
   if(weightEl) weightEl.oninput = e => form.weight = e.target.value;
   if(sleepEl) sleepEl.oninput = e => form.sleepHours = e.target.value;
   if(noteEl) noteEl.oninput = e => form.note = e.target.value;
-  if(techEl) techEl.oninput = e => form.techniques = e.target.value;
+  if(customTechEl) customTechEl.oninput = e => form.customTechnique = e.target.value;
   if(methodEl) methodEl.oninput = e => form.method = e.target.value;
   if(opponentEl) opponentEl.oninput = e => form.opponent = e.target.value;
+
+  document.querySelectorAll('[data-act="toggle-technique"]').forEach(el => el.onclick = () => {
+    const name = el.dataset.name;
+    const idx = form.techniques.findIndex(t=>t.name===name);
+    if(idx>=0) form.techniques.splice(idx,1);
+    else form.techniques.push({ name, feeling: form.feeling });
+    render();
+  });
+  document.querySelectorAll('[data-act="technique-feeling"]').forEach(el => el.onclick = () => {
+    form.techniques[Number(el.dataset.index)].feeling = Number(el.dataset.val);
+    render();
+  });
+  document.querySelectorAll('[data-act="remove-technique"]').forEach(el => el.onclick = () => {
+    form.techniques.splice(Number(el.dataset.index),1);
+    render();
+  });
+  const addCustomBtn = document.getElementById('add-custom-technique-btn');
+  if(addCustomBtn) addCustomBtn.onclick = () => {
+    const name = form.customTechnique.trim();
+    if(!name) return;
+    if(!form.techniques.some(t=>t.name===name)) form.techniques.push({ name, feeling: form.feeling });
+    form.customTechnique = '';
+    render();
+  };
 
   const saveBtn = document.getElementById('save-btn');
   if(saveBtn) saveBtn.onclick = async () => {
@@ -1379,7 +1664,7 @@ function attachHandlers(){
       sleepHours: form.sleepHours ? Number(form.sleepHours) : null,
       feeling: form.feeling,
       note: form.note.trim(),
-      techniques: form.techniques.split(',').map(t=>t.trim()).filter(Boolean),
+      techniques: form.techniques,
       result: form.type==='competition' ? { outcome: form.outcome, method: form.method.trim(), opponent: form.opponent.trim() } : null
     };
     const coach = generateCoachMessage(entry, entries);
@@ -1430,6 +1715,7 @@ function startApp(){
   loadEntries();
   loadGoals().then(render);
   loadHealth().then(render);
+  loadNutrition().then(render);
   trackEvent('session_start', {});
 }
 
