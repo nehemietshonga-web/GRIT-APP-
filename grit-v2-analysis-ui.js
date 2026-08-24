@@ -383,12 +383,15 @@
       return;
     }
 
-    /*
-      Pour l'instant, on ne crée pas encore
-      automatiquement une nouvelle page.
-      Le conteneur sera branché à la navigation
-      GRIT dans l'étape suivante.
-    */
+    const container =
+  document.createElement("div");
+
+container.id =
+  "grit-v2-analysis-container";
+
+document.body.appendChild(container);
+
+renderAnalysis(container);
   }
 
   window.GRIT_V2_ANALYSIS_UI = {
@@ -398,4 +401,7 @@
   };
 
   console.log("GRIT V2 — Analysis UI chargée.");
+
+window.GRIT_V2_ANALYSIS_UI.init();
+
 })();
