@@ -138,6 +138,22 @@ return{score:score===null?null:Math.max(0,Math.round(score)),obs,pri,sh,rp}}
 function coachText(){let a=analysis(),p=get().profile;return`📊 RÉSUMÉ GRIT\n\n🎯 Objectif : ${goalName(p.goal)}\n🏋️ Discipline : ${p.discipline}\n⚡ Score : ${a.score??"—"}/100\n\n🔎 OBSERVATIONS\n${a.obs.map(x=>"• "+x).join("\n")}\n\n🎯 PRIORITÉS\n${a.pri.map((x,i)=>`${i+1}. ${x}`).join("\n")}\n\n📈 Données récentes\n• Séances / 7 j : ${recent(get().sessions).length}\n• Poids : ${p.cw||"—"} kg\n• Sommeil moyen : ${a.sh?a.sh.toFixed(1)+" h":"—"}\n• RPE moyen : ${a.rp?a.rp.toFixed(1)+"/10":"—"}`}
 function render(){
 let d=get(),p=d.profile,a=analysis(),n=nutrition(),w=d.water.filter(x=>x.date===day()).reduce((s,x)=>s+x.liters,0);
+let v2Analysis = null;
+
+if (
+  window.GRIT_V2 &&
+  window.GRIT_V2_ANALYSIS
+) {
+  try {
+    v2Analysis =
+      window.GRIT_V2_ANALYSIS.generateAnalysis();
+  } catch (error) {
+    console.error(
+      "Erreur analyse GRIT V2:",
+      error
+    );
+  }
+}
 headSub.textContent=p.name?`Bonjour ${p.name} · ${p.discipline}`:"Ton espace de progression";homeGoal.textContent=goalName(p.goal);homeText.textContent=p.tw?`Cible : ${p.tw} kg${p.dateTarget?" · "+date(p.dateTarget):""}`:"Renseigne ton objectif pour personnaliser GRIT.";homeScore.textContent=a.score??"—";hw.textContent=p.cw?p.cw+" kg":"—";hs.textContent=recent(d.sessions).length;hsl.textContent=a.sh?a.sh.toFixed(1)+" h":"—";hhy.textContent=w.toFixed(2)+" L";
 today.innerHTML=`<div class="list">🧠 ${a.pri[0]}</div><div class="list">🥗 ${n.prot?`Repère protéines : ~${n.prot} g/j.`:"Renseigne ton poids pour un repère nutritionnel."}</div><div class="list">💧 Hydratation : ${w.toFixed(2)} L aujourd'hui.</div>`;homePri.innerHTML=a.pri.map((x,i)=>`<div class="list"><b>${i+1}.</b> ${x}</div>`).join("");
 t7.textContent=recent(d.sessions).length;tm.textContent=recent(d.sessions).reduce((s,x)=>s+x.minutes,0);tr.textContent=average(recent(d.sessions).map(x=>x.rpe))?.toFixed(1)||"—";td.textContent=p.discipline;
