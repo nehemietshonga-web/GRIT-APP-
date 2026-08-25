@@ -278,6 +278,43 @@
   .add-goal-row{ display:flex; gap: 8px; margin-top: 12px; }
   .add-goal-row input[type=text]{ flex: 1.4; }
   .add-goal-row input[type=date]{ flex: 1; }
+  .goal-item-full{ padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .goal-item-full:last-child{ border-bottom: none; }
+  .goal-item-full .goal-item{ border-bottom: none; padding: 0 0 8px; }
+  .goal-type-tag{
+    display:inline-block; font-family:'IBM Plex Mono', monospace; font-size: 9px; letter-spacing:0.04em;
+    text-transform: uppercase; color: var(--purple); background: rgba(167,139,250,0.14);
+    border-radius: 6px; padding: 2px 7px; margin-top: 3px;
+  }
+  .milestone-progress-bar{
+    height: 6px; border-radius: 4px; background: var(--surface-2); overflow:hidden; margin-top: 4px;
+  }
+  .milestone-progress-bar span{ display:block; height:100%; background: var(--purple); border-radius:4px; transition: width 0.3s ease; }
+  .milestone-progress-label{ font-size: 10.5px; color: var(--text-muted); font-family:'IBM Plex Mono', monospace; margin: 4px 0 8px; }
+  .milestone-list{ display:flex; flex-direction:column; gap: 6px; }
+  .milestone-item{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .milestone-check{ display:flex; align-items:center; gap: 8px; font-size: 13px; flex:1; cursor:pointer; }
+  .milestone-check input[type=checkbox]{ width:16px; height:16px; accent-color: var(--purple); flex-shrink:0; }
+  .milestone-check span.done{ text-decoration: line-through; color: var(--text-muted); }
+  .add-milestone-row{ display:flex; gap: 6px; margin-top: 10px; }
+  .add-milestone-row input{ flex:1; padding: 8px 11px; font-size: 13px; }
+  .add-milestone-row button{
+    flex-shrink:0; padding: 0 12px; border-radius: 10px; border: 1.5px solid var(--purple);
+    background: rgba(167,139,250,0.1); color: var(--purple); font-family:'IBM Plex Mono', monospace;
+    font-size: 11px; cursor:pointer;
+  }
+  .adaptive-coach-card{
+    background: linear-gradient(135deg, rgba(167,139,250,0.14), rgba(62,201,192,0.10));
+    border: 1px solid rgba(167,139,250,0.35);
+    border-radius: 18px; padding: 14px 16px; margin-bottom: 12px;
+    display:flex; gap: 12px; align-items:flex-start;
+  }
+  .adaptive-coach-card .icon{ font-size: 22px; flex-shrink:0; }
+  .adaptive-coach-card .label{
+    font-family:'IBM Plex Mono', monospace; font-size: 10px; letter-spacing:0.08em;
+    text-transform: uppercase; color: var(--purple); margin-bottom: 3px;
+  }
+  .adaptive-coach-card .msg{ font-size: 13.5px; line-height: 1.42; color: var(--text); }
   .btn-secondary{
     width:100%; padding: 12px; border-radius: 12px; border: 1.5px solid var(--teal);
     background: rgba(62,201,192,0.1); color: var(--teal); font-family:'IBM Plex Mono', monospace;
@@ -435,6 +472,14 @@ const EXERCISE_LIBRARY = {
   'Cyclisme': ['Sortie longue','Fractionné','Côtes','Sprint','Récupération'],
   'Autre': []
 };
+const GOAL_TYPES = [
+  { id:'grade', label:'Grade / Ceinture', emoji:'🥋' },
+  { id:'poids', label:'Poids', emoji:'⚖️' },
+  { id:'performance', label:'Performance', emoji:'📈' },
+  { id:'frequence', label:'Fréquence', emoji:'📅' },
+  { id:'autre', label:'Autre', emoji:'🎯' }
+];
+function goalTypeInfo(id){ return GOAL_TYPES.find(t=>t.id===id) || GOAL_TYPES[4]; }
 const FUEL_LEVELS = [
   { emoji:'😣', label:'Épuisé', color:'#e2532d' },
   { emoji:'😕', label:'Bas', color:'#d97a3f' },
@@ -453,7 +498,7 @@ let resetConfirm = false;
 let activeTab = 'new';
 let historyFilter = 'Toutes';
 let lastCoach = null;
-let goalForm = { title: '', date: '' };
+let goalForm = { title: '', date: '', type: 'autre', milestoneDrafts: {} };
 let form = { discipline: 'BJJ', type: 'training', date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '', techniques: [], customTechnique: '', outcome: 'win', method: '', opponent: '' };
 
 function todayStr(){ return new Date().toISOString().slice(0,10); }
@@ -650,6 +695,71 @@ function generateCoachMessage(entry, allEntriesBeforeSave){
   return { icon, text };
 }
 
+// ---- Coach GRIT adaptatif : croise charge récente, santé et objectifs ----
+function goalProgress(g){
+  const milestones = g.milestones || [];
+  const done = milestones.filter(m=>m.done).length;
+  return { done, total: milestones.length, pct: milestones.length ? done/milestones.length : null };
+}
+function generateAdaptiveCoach(){
+  const sorted = [...entries].sort((a,b)=> a.date.localeCompare(b.date));
+  if(sorted.length === 0){
+    return [{ icon:'👋', title:'Bienvenue', text:"Logue ta première séance pour recevoir des recommandations basées sur tes propres données plutôt que des conseils génériques." }];
+  }
+
+  const last7 = sorted.filter(e => daysSince(e.date) <= 7);
+  const prev7 = sorted.filter(e => daysSince(e.date) > 7 && daysSince(e.date) <= 14);
+  const avgFeeling7 = last7.length ? last7.reduce((s,e)=>s+e.feeling,0)/last7.length : null;
+  const avgFeelingPrev7 = prev7.length ? prev7.reduce((s,e)=>s+e.feeling,0)/prev7.length : null;
+
+  const activePain = healthLog.filter(p => daysSince(p.date) <= 10 && p.intensity >= 3);
+  const recurring = recurringPainZones(healthLog);
+
+  const urgentGoals = goals.filter(g => {
+    const d = daysUntil(g.date);
+    if(d === null || d < 0) return false;
+    const prog = goalProgress(g);
+    return d <= 14 && (prog.pct === null || prog.pct < 0.7);
+  }).sort((a,b)=> daysUntil(a.date) - daysUntil(b.date));
+
+  let messages = [];
+
+  if(activePain.length && last7.length >= 3){
+    messages.push({ icon:'🩺', title:'Vigilance santé', text:`Gêne signalée récemment (${escapeHtml(activePain[0].zone)}) alors que le volume d'entraînement reste soutenu (${last7.length} séance(s) sur 7 jours). Adapte l'intensité sur cette zone, ou envisage une consultation si ça persiste.` });
+  } else if(recurring.length){
+    messages.push({ icon:'🩺', title:'Douleur récurrente', text:`${escapeHtml(recurring.join(', '))} revient régulièrement dans ton suivi santé. Si ce n'est pas déjà fait, ça vaut le coup d'en parler à un professionnel (kiné, médecin du sport).` });
+  }
+
+  if(last7.length >= 5){
+    messages.push({ icon:'⚠️', title:'Charge élevée', text:`${last7.length} séances loguées sur les 7 derniers jours. Prévois un vrai jour de repos cette semaine pour éviter l'accumulation de fatigue.` });
+  } else if(avgFeeling7 !== null && avgFeelingPrev7 !== null){
+    const diff = avgFeeling7 - avgFeelingPrev7;
+    if(diff <= -0.8){
+      messages.push({ icon:'📉', title:'Fatigue en hausse', text:`Ta jauge moyenne de ressenti est passée de ${avgFeelingPrev7.toFixed(1)}/5 à ${avgFeeling7.toFixed(1)}/5 sur les 7 derniers jours. Un cycle un peu plus léger pourrait t'aider à repartir plus fort.` });
+    } else if(diff >= 0.8){
+      messages.push({ icon:'📈', title:'Bonne dynamique', text:`Ta jauge de ressenti progresse (${avgFeelingPrev7.toFixed(1)} → ${avgFeeling7.toFixed(1)} sur 5). C'est un bon moment pour viser un peu plus haut si tu te sens prêt.` });
+    }
+  }
+
+  if(urgentGoals.length){
+    const g = urgentGoals[0];
+    const d = daysUntil(g.date);
+    const prog = goalProgress(g);
+    messages.push({ icon:'🎯', title:'Objectif qui approche', text:`« ${escapeHtml(g.title)} » arrive dans ${d} jour(s)${prog.total ? ` — ${prog.done}/${prog.total} jalons validés` : ''}. Priorise les séances qui te rapprochent le plus de cet objectif.` });
+  }
+
+  const gap = daysSince(sorted[sorted.length-1].date);
+  if(gap >= 4){
+    messages.push({ icon:'⏰', title:'Reprise en douceur', text:`Ça fait ${gap} jours sans séance loguée. Une reprise progressive vaut mieux qu'une rentrée trop intense après une pause.` });
+  }
+
+  if(messages.length === 0){
+    messages.push({ icon:'✅', title:'Tout est aligné', text:"Ta charge d'entraînement, ta récupération et tes objectifs semblent bien équilibrés en ce moment. Continue comme ça." });
+  }
+
+  return messages.slice(0,3);
+}
+
 // ---- Conseils récupération : sommeil + hydratation basés sur la dernière séance ----
 const GENERAL_TIPS = [
   { icon:'🧊', body:"Alterne chaud/froid sur les zones sollicitées (douche froide, glace) pour accélérer la récupération musculaire." },
@@ -768,13 +878,37 @@ function renderAdvice(){
 
   const goalsList = goals.length ? goals.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(g => {
     const d = daysUntil(g.date);
-    return `<div class="goal-item">
-      <div>
-        <div class="goal-title">${escapeHtml(g.title)}</div>
-        <div class="goal-date">${formatDate(g.date)}</div>
+    const milestones = g.milestones || [];
+    const prog = goalProgress(g);
+    const typeInfo = goalTypeInfo(g.type);
+    const milestoneRows = milestones.map(m => `
+      <div class="milestone-item">
+        <label class="milestone-check">
+          <input type="checkbox" data-act="toggle-milestone" data-goal="${g.id}" data-id="${m.id}" ${m.done?'checked':''}>
+          <span class="${m.done?'done':''}">${escapeHtml(m.label)}</span>
+        </label>
+        <button class="del-btn" data-act="delete-milestone" data-goal="${g.id}" data-id="${m.id}" style="margin-top:0;">✕</button>
       </div>
-      <div class="goal-countdown">${d >= 0 ? d : 0}<small>${d >= 0 ? 'jours restants' : 'passé'}</small></div>
-      <button class="del-btn" data-act="delete-goal" data-id="${g.id}" style="margin-top:0;">✕</button>
+    `).join('');
+    return `<div class="goal-item-full">
+      <div class="goal-item">
+        <div>
+          <div class="goal-title">${escapeHtml(g.title)}</div>
+          <div class="goal-date">${formatDate(g.date)}</div>
+          <div class="goal-type-tag">${typeInfo.emoji} ${typeInfo.label}</div>
+        </div>
+        <div class="goal-countdown">${d >= 0 ? d : 0}<small>${d >= 0 ? 'jours restants' : 'passé'}</small></div>
+        <button class="del-btn" data-act="delete-goal" data-id="${g.id}" style="margin-top:0;">✕</button>
+      </div>
+      ${milestones.length ? `
+        <div class="milestone-progress-bar"><span style="width:${Math.round((prog.pct||0)*100)}%"></span></div>
+        <div class="milestone-progress-label">${prog.done}/${prog.total} jalons · ${Math.round((prog.pct||0)*100)}%</div>
+        <div class="milestone-list">${milestoneRows}</div>
+      ` : ''}
+      <div class="add-milestone-row">
+        <input type="text" data-milestone-input="${g.id}" placeholder="+ jalon (ex : 500g de moins)" value="${escapeHtml(goalForm.milestoneDrafts[g.id] || '')}">
+        <button data-act="add-milestone" data-goal="${g.id}">Ajouter</button>
+      </div>
     </div>`;
   }).join('') : `<div class="empty" style="padding:20px 0;">Aucun objectif pour l'instant.</div>`;
 
@@ -869,15 +1003,19 @@ function renderAdvice(){
     </div>`;
 
   return `
+    ${renderAdaptiveCoachCards()}
     ${reminder}
     ${hero}
     ${healthSection}
     <div class="card">
       <div class="section-label">🎯 Objectifs & échéances</div>
       ${goalsList}
+      <div class="seg" style="margin-bottom:10px;">
+        ${GOAL_TYPES.map(t => `<button data-act="goal-type" data-val="${t.id}" class="${goalForm.type===t.id?'active':''}" style="font-size:10px;">${t.emoji}</button>`).join('')}
+      </div>
       <div class="add-goal-row">
-        <input type="text" id="g-title" placeholder="ex : Europeans IBJJF">
-        <input type="date" id="g-date">
+        <input type="text" id="g-title" placeholder="ex : Europeans IBJJF" value="${escapeHtml(goalForm.title)}">
+        <input type="date" id="g-date" value="${goalForm.date}">
       </div>
       <button class="btn-secondary" id="add-goal-btn">+ Ajouter l'objectif</button>
     </div>
@@ -1053,6 +1191,19 @@ function renderCoachCard(){
       <div class="msg">${lastCoach.text}</div>
     </div>
   </div>`;
+}
+
+function renderAdaptiveCoachCards(){
+  const messages = generateAdaptiveCoach();
+  return messages.map(m => `
+    <div class="adaptive-coach-card">
+      <div class="icon">${m.icon}</div>
+      <div>
+        <div class="label">Coach GRIT · ${escapeHtml(m.title)}</div>
+        <div class="msg">${m.text}</div>
+      </div>
+    </div>
+  `).join('');
 }
 
 function renderQuoteCard(){
@@ -1506,21 +1657,68 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-act="delete-goal"]').forEach(b => b.onclick = async () => {
     goals = goals.filter(g => g.id !== b.dataset.id);
+    delete goalForm.milestoneDrafts[b.dataset.id];
     await saveGoals();
     render();
     showToast('Objectif supprimé');
   });
+
+  document.querySelectorAll('[data-act="goal-type"]').forEach(b => b.onclick = () => {
+    goalForm.type = b.dataset.val;
+    render();
+  });
+
+  const gTitleEl = document.getElementById('g-title');
+  const gDateEl = document.getElementById('g-date');
+  if(gTitleEl) gTitleEl.oninput = e => goalForm.title = e.target.value;
+  if(gDateEl) gDateEl.oninput = e => goalForm.date = e.target.value;
 
   const addGoalBtn = document.getElementById('add-goal-btn');
   if(addGoalBtn) addGoalBtn.onclick = async () => {
     const titleEl = document.getElementById('g-title');
     const dateEl2 = document.getElementById('g-date');
     if(!titleEl.value.trim() || !dateEl2.value) { showToast('Titre et date requis'); return; }
-    goals.push({ id: uid(), title: titleEl.value.trim(), date: dateEl2.value });
+    goals.push({ id: uid(), title: titleEl.value.trim(), date: dateEl2.value, type: goalForm.type, milestones: [] });
     await saveGoals();
+    goalForm.title = ''; goalForm.date = ''; goalForm.type = 'autre';
     showToast('Objectif ajouté 🎯');
     render();
   };
+
+  document.querySelectorAll('[data-milestone-input]').forEach(el => el.oninput = e => {
+    goalForm.milestoneDrafts[el.dataset.milestoneInput] = e.target.value;
+  });
+  document.querySelectorAll('[data-act="add-milestone"]').forEach(b => b.onclick = async () => {
+    const goalId = b.dataset.goal;
+    const val = (goalForm.milestoneDrafts[goalId] || '').trim();
+    if(!val){ showToast('Écris un jalon avant de l\'ajouter'); return; }
+    const g = goals.find(g => g.id === goalId);
+    if(!g) return;
+    if(!g.milestones) g.milestones = [];
+    g.milestones.push({ id: uid(), label: val, done: false });
+    goalForm.milestoneDrafts[goalId] = '';
+    await saveGoals();
+    showToast('Jalon ajouté');
+    render();
+  });
+  document.querySelectorAll('[data-act="toggle-milestone"]').forEach(el => el.onchange = async () => {
+    const g = goals.find(g => g.id === el.dataset.goal);
+    if(!g) return;
+    const m = (g.milestones||[]).find(m => m.id === el.dataset.id);
+    if(!m) return;
+    m.done = el.checked;
+    await saveGoals();
+    const wasComplete = g.milestones.every(m=>m.done);
+    if(wasComplete && g.milestones.length) showToast(`Objectif « ${g.title} » complété 🏁`);
+    render();
+  });
+  document.querySelectorAll('[data-act="delete-milestone"]').forEach(b => b.onclick = async () => {
+    const g = goals.find(g => g.id === b.dataset.goal);
+    if(!g) return;
+    g.milestones = (g.milestones||[]).filter(m => m.id !== b.dataset.id);
+    await saveGoals();
+    render();
+  });
 
   const genSummaryBtn = document.getElementById('gen-summary-btn');
   if(genSummaryBtn) genSummaryBtn.onclick = () => {
