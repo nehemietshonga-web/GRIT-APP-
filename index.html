@@ -467,6 +467,10 @@ async function loadEntries(){
     const v = localStorage.getItem(STORAGE_KEY);
     entries = v ? JSON.parse(v) : [];
   }catch(e){ entries = []; }
+  if(entries.length){
+    const mostRecent = [...entries].sort((a,b)=> b.date.localeCompare(a.date))[0];
+    programDiscipline = mostRecent.discipline;
+  }
   render();
 }
 async function saveEntries(){
@@ -786,7 +790,7 @@ function renderAdvice(){
       <span>Ça fait <b>${gap} jours</b> sans séance loguée. Une reprise en douceur aujourd'hui peut valoir mieux qu'attendre d'être à 100%.</span>
     </div>` : '';
 
-  if(last && !generatedProgram) programDiscipline = last.discipline;
+  // (note: la discipline du programme n'est plus resynchronisée automatiquement à chaque rendu, pour laisser le choix de l'utilisateur intact)
 
   const ascSorted = [...entries].sort((a,b)=> a.date.localeCompare(b.date));
   const tierLabels = { light:'🟦 Semaine allégée', moderate:'🟨 Semaine équilibrée', high:'🟥 Semaine intense' };
