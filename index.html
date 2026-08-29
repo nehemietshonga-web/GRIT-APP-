@@ -680,6 +680,46 @@ function getHydrationAdvice(entry){
   return `Vise environ ${liters.toFixed(1)} L d'eau aujourd'hui, réparti dans la journée, avec un bon verre juste après la séance pour compenser la transpiration.`;
 }
 
+function getFoodSuggestions(entry, recentNutrition){
+  const suggestions = [];
+
+  // Post-effort : protéines + glucides complexes pour la récupération
+  suggestions.push({
+    icon: '🍗',
+    title: 'Après la séance',
+    body: "Privilégie une source de protéines (œufs, poulet, poisson, légumineuses) associée à des glucides complexes (riz complet, patate douce, avoine) dans les heures qui suivent — ça aide la récupération musculaire."
+  });
+
+  // Fatigue chronique / jauge basse récurrente
+  const lowFeelingStreak = entry.feeling <= 2;
+  if(lowFeelingStreak){
+    suggestions.push({
+      icon: '🥬',
+      title: 'Coup de fatigue',
+      body: "Les aliments riches en fer (légumineuses, viande rouge maigre, épinards) et en vitamine B12 peuvent aider en cas de fatigue. Si la fatigue persiste dans la durée, ça vaut le coup d'en parler à un médecin plutôt que de se fier à l'alimentation seule."
+    });
+  }
+
+  // Digestion difficile récente
+  const recentDifficultDigestion = recentNutrition.filter(n => n.digestion === 'Difficile' && daysSince(n.date) <= 7).length >= 2;
+  if(recentDifficultDigestion){
+    suggestions.push({
+      icon: '🍚',
+      title: 'Digestion sensible cette semaine',
+      body: "Des aliments plus faciles à digérer (riz blanc, légumes cuits, bananes) peuvent soulager en période sensible, en attendant que ça se stabilise."
+    });
+  }
+
+  // Général : variété et hydratation
+  suggestions.push({
+    icon: '🥗',
+    title: 'Au quotidien',
+    body: "Varier les fruits et légumes colorés couvre plus facilement l'ensemble des besoins en vitamines et minéraux qu'un régime répétitif."
+  });
+
+  return suggestions;
+}
+
 function generateCoachSummary(){
   const sorted = [...entries].sort((a,b)=> b.date.localeCompare(a.date));
   const last7 = sorted.filter(e => daysSince(e.date) <= 7);
@@ -888,6 +928,11 @@ function renderAdvice(){
         <div class="stat-box"><div class="num">${nutritionLog.length}</div><div class="lbl">📋 Repas loggés</div></div>
         <div class="stat-box"><div class="num">${nutritionLog.length && nutritionLog[nutritionLog.length-1].hydration ? nutritionLog[nutritionLog.length-1].hydration : '—'}</div><div class="lbl">💧 Dernière hydratation (L)</div></div>
       </div>
+      ${last ? `
+      <div class="section-label" style="margin-top:4px;">🥗 Aliments à privilégier pour toi</div>
+      ${getFoodSuggestions(last, nutritionLog).map(s => `<div class="tip-item"><div class="icon">${s.icon}</div><div class="body"><b>${s.title}</b> — ${s.body}</div></div>`).join('')}
+      <div style="font-size:11px; color:var(--text-muted); margin:10px 0 16px; opacity:0.8;">Suggestions générales, pas un plan nutritionnel personnalisé — pour un vrai accompagnement, un(e) nutritionniste reste la meilleure ressource.</div>
+      ` : ''}
       <label>Alimentation du jour</label>
       <textarea id="nutrition-notes" placeholder="ex : petit-déj léger, bon appétit le midi, repas post-training...">${escapeHtml(nutritionForm.notes)}</textarea>
       <label>Hydratation (L)</label>
