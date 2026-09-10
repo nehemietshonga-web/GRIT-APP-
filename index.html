@@ -364,6 +364,7 @@ const STORAGE_KEY = 'grit-entries';
 const GOALS_KEY = 'grit-goals';
 const HEALTH_KEY = 'grit-health';
 const NUTRITION_KEY = 'grit-nutrition';
+const NUTRITION_PROFILE_KEY = 'grit-nutrition-profile';
 
 // ---- Suivi d'usage (opt-in) — remplis avec tes identifiants Supabase ----
 const SUPABASE_URL = 'https://scexqhoojtxlduahbtkc.supabase.co';
@@ -475,6 +476,8 @@ let goals = [];
 let healthLog = [];
 let nutritionLog = [];
 let nutritionForm = { notes:'', hydration:'', digestion:'Bien' };
+let nutritionProfile = { height:'', weightKg:'', age:'', sex:'homme', activity:'', goal:'maintien' };
+let nutritionCalcResult = null;
 let painForm = { zone: '', intensity: 3, note: '' };
 let programDiscipline = 'BJJ';
 let generatedProgram = null;
@@ -533,6 +536,64 @@ async function loadNutrition(){
 async function saveNutrition(){
   try{ localStorage.setItem(NUTRITION_KEY, JSON.stringify(nutritionLog)); }
   catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+async function loadNutritionProfile(){
+  try{
+    const v = localStorage.getItem(NUTRITION_PROFILE_KEY);
+    if(v) nutritionProfile = { ...nutritionProfile, ...JSON.parse(v) };
+  }catch(e){ /* garde les valeurs par défaut */ }
+}
+async function saveNutritionProfile(){
+  try{ localStorage.setItem(NUTRITION_PROFILE_KEY, JSON.stringify(nutritionProfile)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+const ACTIVITY_LEVELS = [
+  { key:'sedentaire', label:'Sédentaire', hint:'peu ou pas de sport', multiplier:1.2 },
+  { key:'leger', label:'Léger', hint:'1-3 séances/sem', multiplier:1.375 },
+  { key:'modere', label:'Modéré', hint:'3-5 séances/sem', multiplier:1.55 },
+  { key:'intense', label:'Intense', hint:'6-7 séances/sem', multiplier:1.725 },
+  { key:'tres_intense', label:'Très intense', hint:'2x/jour, sport de combat', multiplier:1.9 }
+];
+const GOAL_OPTIONS = [
+  { key:'perte', label:'Perte de poids', calorieFactor:0.8, proteinPerKg:2.2 },
+  { key:'maintien', label:'Maintien', calorieFactor:1.0, proteinPerKg:1.8 },
+  { key:'prise', label:'Prise de masse', calorieFactor:1.12, proteinPerKg:2.0 },
+  { key:'performance', label:'Performance sportive', calorieFactor:1.05, proteinPerKg:2.0 }
+];
+function suggestActivityLevel(list){
+  const count = list.filter(e => daysSince(e.date) <= 7).length;
+  if(count <= 1) return 'sedentaire';
+  if(count <= 3) return 'leger';
+  if(count <= 5) return 'modere';
+  if(count <= 7) return 'intense';
+  return 'tres_intense';
+}
+function computeNutrientNeeds(profile){
+  const w = parseFloat(profile.weightKg);
+  const h = parseFloat(profile.height);
+  const a = parseInt(profile.age, 10);
+  if(!w || !h || !a || w <= 0 || h <= 0 || a <= 0) return null;
+  const bmr = profile.sex === 'femme'
+    ? (10*w + 6.25*h - 5*a - 161)
+    : (10*w + 6.25*h - 5*a + 5);
+  const activityInfo = ACTIVITY_LEVELS.find(l => l.key === profile.activity) || ACTIVITY_LEVELS[2];
+  const goalInfo = GOAL_OPTIONS.find(g => g.key === profile.goal) || GOAL_OPTIONS[1];
+  const tdee = bmr * activityInfo.multiplier;
+  const calories = tdee * goalInfo.calorieFactor;
+  const proteinG = w * goalInfo.proteinPerKg;
+  const fatG = w * 0.8;
+  const proteinKcal = proteinG * 4;
+  const fatKcal = fatG * 9;
+  const carbsKcal = Math.max(0, calories - proteinKcal - fatKcal);
+  const carbsG = carbsKcal / 4;
+  return {
+    bmr: Math.round(bmr),
+    tdee: Math.round(tdee),
+    calories: Math.round(calories),
+    protein: Math.round(proteinG),
+    fat: Math.round(fatG),
+    carbs: Math.round(carbsG)
+  };
 }
 function weightCutAlert(list){
   const withWeight = list.filter(e=>e.weight).sort((a,b)=>a.date.localeCompare(b.date));
@@ -964,7 +1025,44 @@ function renderAdvice(){
       ${getFoodSuggestions(last, nutritionLog).map(s => `<div class="tip-item"><div class="icon">${s.icon}</div><div class="body"><b>${s.title}</b> — ${s.body}</div></div>`).join('')}
       <div style="font-size:11px; color:var(--text-muted); margin:10px 0 16px; opacity:0.8;">Suggestions générales, pas un plan nutritionnel personnalisé — pour un vrai accompagnement, un(e) nutritionniste reste la meilleure ressource.</div>
       ` : ''}
-      <label>Alimentation du jour</label>
+
+      <div class="section-label" style="margin-top:4px;">🧮 Calculateur de besoins nutritionnels</div>
+      <div class="stat-grid" style="grid-template-columns:1fr 1fr; gap:8px;">
+        <div><label>Taille (cm)</label><input type="number" step="1" id="calc-height" placeholder="ex : 178" value="${nutritionProfile.height}"></div>
+        <div><label>Poids (kg)</label><input type="number" step="0.1" id="calc-weight" placeholder="ex : 76" value="${nutritionProfile.weightKg}"></div>
+        <div><label>Âge</label><input type="number" step="1" id="calc-age" placeholder="ex : 27" value="${nutritionProfile.age}"></div>
+        <div>
+          <label>Sexe</label>
+          <div class="seg">
+            <button data-act="calc-sex" data-val="homme" class="${nutritionProfile.sex==='homme'?'active':''}">Homme</button>
+            <button data-act="calc-sex" data-val="femme" class="${nutritionProfile.sex==='femme'?'active':''}">Femme</button>
+          </div>
+        </div>
+      </div>
+      <label style="margin-top:10px;">Niveau d'activité</label>
+      <div class="seg" style="flex-wrap:wrap;">
+        ${ACTIVITY_LEVELS.map(l => `<button data-act="calc-activity" data-val="${l.key}" class="${nutritionProfile.activity===l.key?'active':''}" title="${l.hint}">${l.label}</button>`).join('')}
+      </div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+        ${entries.length ? `D'après tes séances loggées cette semaine, ton niveau se rapprocherait plutôt de « ${ACTIVITY_LEVELS.find(l=>l.key===suggestActivityLevel(entries)).label} ».` : `Loggue quelques séances pour obtenir une suggestion automatique.`}
+      </div>
+      <label style="margin-top:10px;">Objectif</label>
+      <div class="seg" style="flex-wrap:wrap;">
+        ${GOAL_OPTIONS.map(g => `<button data-act="calc-goal" data-val="${g.key}" class="${nutritionProfile.goal===g.key?'active':''}">${g.label}</button>`).join('')}
+      </div>
+      <button class="btn-secondary" id="calc-nutrients-btn" style="border-color:var(--gold); color:var(--gold); background:rgba(217,164,65,0.08); margin-top:12px;">🧮 Calculer mes besoins</button>
+      ${nutritionCalcResult ? `
+        <div class="stat-grid" style="margin-top:14px;">
+          <div class="stat-box"><div class="num">${nutritionCalcResult.calories}</div><div class="lbl">🔥 Calories/jour (kcal)</div></div>
+          <div class="stat-box"><div class="num">${nutritionCalcResult.protein}g</div><div class="lbl">🥩 Protéines</div></div>
+          <div class="stat-box"><div class="num">${nutritionCalcResult.carbs}g</div><div class="lbl">🍚 Glucides</div></div>
+          <div class="stat-box"><div class="num">${nutritionCalcResult.fat}g</div><div class="lbl">🥑 Lipides</div></div>
+        </div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:8px; opacity:0.8;">Basé sur ton métabolisme de base (${nutritionCalcResult.bmr} kcal) et ta dépense totale estimée (${nutritionCalcResult.tdee} kcal). Estimation, pas un avis médical — un(e) nutritionniste reste la meilleure ressource pour un plan précis.</div>
+      ` : ''}
+      <div style="font-size:11px; color:var(--text-muted); margin:14px 0 4px; opacity:0.8;">Ces informations restent strictement privées, comme le reste de ton profil de santé.</div>
+
+      <label style="margin-top:16px;">Alimentation du jour</label>
       <textarea id="nutrition-notes" placeholder="ex : petit-déj léger, bon appétit le midi, repas post-training...">${escapeHtml(nutritionForm.notes)}</textarea>
       <label>Hydratation (L)</label>
       <input type="number" step="0.1" id="nutrition-hydration" value="${nutritionForm.hydration}">
@@ -1743,6 +1841,26 @@ function attachHandlers(){
     render();
   };
 
+  const calcHeightEl = document.getElementById('calc-height');
+  const calcWeightEl = document.getElementById('calc-weight');
+  const calcAgeEl = document.getElementById('calc-age');
+  if(calcHeightEl) calcHeightEl.oninput = e => nutritionProfile.height = e.target.value;
+  if(calcWeightEl) calcWeightEl.oninput = e => nutritionProfile.weightKg = e.target.value;
+  if(calcAgeEl) calcAgeEl.oninput = e => nutritionProfile.age = e.target.value;
+  document.querySelectorAll('[data-act="calc-sex"]').forEach(b => b.onclick = () => { nutritionProfile.sex = b.dataset.val; render(); });
+  document.querySelectorAll('[data-act="calc-activity"]').forEach(b => b.onclick = () => { nutritionProfile.activity = b.dataset.val; render(); });
+  document.querySelectorAll('[data-act="calc-goal"]').forEach(b => b.onclick = () => { nutritionProfile.goal = b.dataset.val; render(); });
+  const calcNutrientsBtn = document.getElementById('calc-nutrients-btn');
+  if(calcNutrientsBtn) calcNutrientsBtn.onclick = async () => {
+    if(!nutritionProfile.activity) nutritionProfile.activity = suggestActivityLevel(entries);
+    const result = computeNutrientNeeds(nutritionProfile);
+    if(!result){ showToast('Renseigne taille, poids et âge'); return; }
+    nutritionCalcResult = result;
+    await saveNutritionProfile();
+    render();
+    showToast('Besoins calculés 🧮');
+  };
+
   document.querySelectorAll('[data-act="program-discipline"]').forEach(b => b.onclick = () => {
     programDiscipline = b.dataset.val;
     generatedProgram = null;
@@ -1893,6 +2011,7 @@ function startApp(){
   loadGoals().then(render);
   loadHealth().then(render);
   loadNutrition().then(render);
+  loadNutritionProfile().then(render);
   trackEvent('session_start', {});
 }
 
