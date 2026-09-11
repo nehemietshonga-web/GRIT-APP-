@@ -895,6 +895,8 @@ function renderAdvice(){
       <button class="btn-secondary" id="generate-program-btn">🔄 Générer le programme</button>
       ${generatedProgram ? `
         <div style="margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--gold); text-transform:uppercase; letter-spacing:0.04em;">${tierLabels[generatedProgram.tier]}</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:6px;">${escapeHtml(generatedProgram.reasoning)}</div>
+        <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">${generatedProgram.trainingDaysCount} jour(s) d'entraînement · ${generatedProgram.restDaysCount} jour(s) de repos</div>
         <div style="margin-top:8px;">
           ${generatedProgram.days.map(d => `
             <div style="display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--border);">
@@ -902,7 +904,8 @@ function renderAdvice(){
               <div style="flex:1;">
                 <div style="font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace;">${d.day}</div>
                 <div style="font-size:13.5px; font-weight:600;">${d.type}</div>
-                ${d.detail ? `<div style="font-size:12px; color:var(--text-muted);">${escapeHtml(d.detail)}</div>` : ''}
+                ${d.duration ? `<div style="font-size:11.5px; color:var(--gold); margin-top:1px;">${d.duration}</div>` : ''}
+                ${d.detail ? `<div style="font-size:12px; color:var(--text-muted); margin-top:1px;">${escapeHtml(d.detail)}</div>` : ''}
               </div>
             </div>
           `).join('')}
@@ -1436,14 +1439,49 @@ const DAY_ICONS = {
   'Sparring léger':'🥊', 'Sparring':'🥊', 'Sparring / prépa compét':'🥊',
   'Renforcement':'🏋️'
 };
+const SESSION_DURATION = {
+  'Repos complet': null, 'Repos': null,
+  'Repos actif': '20-30 min · marche, étirements ou mobilité légère',
+  'Technique légère': '30-40 min · rythme cool, priorité à la qualité d\'exécution',
+  'Technique': '45-60 min · intensité normale',
+  'Technique ciblée': '45-60 min · focus qualité, pas de volume pour le volume',
+  'Technique intensive': '60-75 min · haut volume, reste attentif aux signaux de fatigue',
+  'Cardio léger': '20-30 min · faible intensité, zone confortable',
+  'Cardio modéré': '30-40 min · intensité moyenne',
+  'Cardio intensif': '40-50 min · haute intensité, fractionné possible',
+  'Sparring léger': '20-30 min de rounds · contrôlé, pas 100%',
+  'Sparring': '30-45 min de rounds · intensité normale',
+  'Sparring / prépa compét': '45-60 min · conditions proches de la compétition',
+  'Renforcement': '30-40 min · charge modérée à élevée'
+};
+const REST_TIPS = [
+  'Sommeil et hydratation en priorité — c\'est là que la récupération se joue vraiment.',
+  'Marche, étirements légers ou mobilité si tu en ressens le besoin, sans forcer.',
+  'Jour clé pour la récupération musculaire et nerveuse, surtout après une séance intense.'
+];
+const WEEKDAY_FULL = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
 
 function generateWeeklyProgram(discipline, sorted){
   const disciplineEntries = sorted.filter(e => e.discipline === discipline && daysSince(e.date) <= 14);
   const pool = disciplineEntries.length >= 2 ? disciplineEntries : sorted.filter(e => daysSince(e.date) <= 14);
+
   let tier = 'moderate';
+  let avgFeeling = null;
   if(pool.length >= 2){
-    const avg = pool.reduce((s,e)=>s+e.feeling,0)/pool.length;
-    tier = avg <= 2.6 ? 'light' : avg >= 3.8 ? 'high' : 'moderate';
+    avgFeeling = pool.reduce((s,e)=>s+e.feeling,0)/pool.length;
+    tier = avgFeeling <= 2.6 ? 'light' : avgFeeling >= 3.8 ? 'high' : 'moderate';
+  }
+
+  // Ajustement selon la dette de sommeil récente : un sommeil dégradé fait baisser le palier d'un cran
+  const sleepStats = computeSleepStats(sorted);
+  let sleepDowngrade = false;
+  if(sleepStats && sleepStats.count >= 3){
+    const recentSleep = sleepStats.withSleep.slice(-5);
+    const recentAvgSleep = recentSleep.reduce((s,e)=>s+e.sleepHours,0)/recentSleep.length;
+    if(recentAvgSleep < 6.5 && tier !== 'light'){
+      tier = tier === 'high' ? 'moderate' : 'light';
+      sleepDowngrade = true;
+    }
   }
 
   const analysis = generateAnalysis(sorted);
@@ -1458,10 +1496,29 @@ function generateWeeklyProgram(discipline, sorted){
     return shuffled.slice(0,n);
   }
 
+  // Raison affichée à l'utilisateur, construite à partir des données réelles
+  const reasons = [];
+  if(avgFeeling !== null){
+    reasons.push(`jauge moyenne de ${avgFeeling.toFixed(1)}/5 sur tes séances récentes`);
+  } else {
+    reasons.push('pas encore assez de séances récentes pour calculer ta jauge — palier par défaut');
+  }
+  if(sleepDowngrade){
+    reasons.push('sommeil sous 6h30 en moyenne ces derniers jours, palier réduit en conséquence');
+  }
+  const gapDays = sorted.length ? daysSince(sorted[0].date) : null;
+  if(gapDays !== null && gapDays >= 4){
+    reasons.push(`${gapDays} jours sans séance loguée, reprise progressive privilégiée`);
+  }
+  const reasoning = `Basé sur : ${reasons.join(' · ')}.`;
+
   const template = PROGRAM_TEMPLATES[tier];
-  const dayNames = ['Aujourd\'hui','Jour 2','Jour 3','Jour 4','Jour 5','Jour 6','Jour 7'];
+  const todayIdx = new Date().getDay();
 
   const days = template.map((type,i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const dayLabel = i === 0 ? `Aujourd'hui · ${WEEKDAY_FULL[d.getDay()]}` : `${WEEKDAY_FULL[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}`;
     let detail = '';
     if(type === 'Technique ciblée' && weakTech){
       detail = `Focus : ${weakTech}`;
@@ -1469,10 +1526,17 @@ function generateWeeklyProgram(discipline, sorted){
       const picks = pickTechniques(2);
       if(picks.length) detail = picks.join(', ');
     }
-    return { day: dayNames[i], type, icon: DAY_ICONS[type] || '📋', detail };
+    const isRest = type.includes('Repos') && type !== 'Repos actif';
+    if(isRest && !detail){
+      detail = REST_TIPS[i % REST_TIPS.length];
+    }
+    return { day: dayLabel, type, icon: DAY_ICONS[type] || '📋', detail, duration: SESSION_DURATION[type] || null, isRest };
   });
 
-  return { tier, days, weakTech };
+  const trainingDaysCount = days.filter(d => !d.isRest).length;
+  const restDaysCount = days.length - trainingDaysCount;
+
+  return { tier, days, weakTech, reasoning, trainingDaysCount, restDaysCount };
 }
 
 function computeSleepStats(sorted){
