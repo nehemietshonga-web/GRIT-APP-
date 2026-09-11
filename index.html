@@ -1475,6 +1475,43 @@ function generateWeeklyProgram(discipline, sorted){
   return { tier, days, weakTech };
 }
 
+function computeSleepStats(sorted){
+  const withSleep = sorted.filter(e => e.sleepHours).map(e => ({...e, sleepHours: Number(e.sleepHours)}));
+  if(!withSleep.length) return null;
+  const hours = withSleep.map(e => e.sleepHours);
+  const avg = hours.reduce((a,b)=>a+b,0) / hours.length;
+  const min = Math.min(...hours);
+  const max = Math.max(...hours);
+  const under7 = withSleep.filter(e => e.sleepHours < 7).length;
+  const under6 = withSleep.filter(e => e.sleepHours < 6).length;
+  const pctUnder7 = Math.round((under7 / withSleep.length) * 100);
+  const variance = hours.reduce((s,h) => s + Math.pow(h - avg, 2), 0) / hours.length;
+  const stdDev = Math.sqrt(variance);
+  const recentWindow = withSleep.slice(-7);
+  const priorWindow = withSleep.slice(-14, -7);
+  let trend = null;
+  if(recentWindow.length >= 3 && priorWindow.length >= 3){
+    const avgRecent = recentWindow.reduce((s,e)=>s+e.sleepHours,0) / recentWindow.length;
+    const avgPrior = priorWindow.reduce((s,e)=>s+e.sleepHours,0) / priorWindow.length;
+    trend = { avgRecent, avgPrior, diff: avgRecent - avgPrior };
+  }
+  return { withSleep, avg, min, max, under7, under6, pctUnder7, stdDev, trend, count: withSleep.length };
+}
+function sleepByWeekday(withSleep){
+  const byWeekday = {};
+  withSleep.forEach(e => {
+    const wd = new Date(e.date+'T00:00:00').getDay();
+    if(!byWeekday[wd]) byWeekday[wd] = [];
+    byWeekday[wd].push(e.sleepHours);
+  });
+  const weekdayNames = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const avgs = Object.entries(byWeekday).filter(([,v])=>v.length>=2).map(([wd,v])=>({wd:Number(wd), avg: v.reduce((a,b)=>a+b,0)/v.length}));
+  if(avgs.length < 3) return null;
+  const worst = [...avgs].sort((a,b)=>a.avg-b.avg)[0];
+  const best = [...avgs].sort((a,b)=>b.avg-a.avg)[0];
+  return { worstDay: weekdayNames[worst.wd], worstAvg: worst.avg, bestDay: weekdayNames[best.wd], bestAvg: best.avg };
+}
+
 function generateAnalysis(sorted){
   const insights = [];
   if(sorted.length < 5) return insights;
@@ -1536,16 +1573,44 @@ function generateAnalysis(sorted){
 
   // 5. Lien sommeil / ressenti
   const withSleep = sorted.filter(e=>e.sleepHours);
-  if(withSleep.length >= 6){
+  if(withSleep.length >= 5){
     const lowSleep = withSleep.filter(e=>e.sleepHours < 7);
     const goodSleep = withSleep.filter(e=>e.sleepHours >= 7);
     if(lowSleep.length >= 2 && goodSleep.length >= 2){
       const avgLow = lowSleep.reduce((s,e)=>s+e.feeling,0)/lowSleep.length;
       const avgGood = goodSleep.reduce((s,e)=>s+e.feeling,0)/goodSleep.length;
-      if(avgGood - avgLow >= 0.4){
+      if(avgGood - avgLow >= 0.3){
         insights.push({ icon:'😴', text: `Tes séances après une nuit de 7h+ ont une jauge moyenne de ${avgGood.toFixed(1)}/5, contre ${avgLow.toFixed(1)}/5 après moins de 7h — le sommeil compte visiblement beaucoup pour toi.` });
       }
     }
+  }
+
+  // 5bis. Tendance du sommeil (7 derniers jours vs 7 précédents)
+  const sleepStatsForTrend = computeSleepStats(sorted);
+  if(sleepStatsForTrend && sleepStatsForTrend.trend && Math.abs(sleepStatsForTrend.trend.diff) >= 0.5){
+    const t = sleepStatsForTrend.trend;
+    insights.push({
+      icon: t.diff > 0 ? '📈' : '📉',
+      text: t.diff > 0
+        ? `Ton sommeil s'améliore : ${t.avgRecent.toFixed(1)}h/nuit en moyenne cette semaine contre ${t.avgPrior.toFixed(1)}h la semaine d'avant.`
+        : `Ton sommeil a reculé : ${t.avgRecent.toFixed(1)}h/nuit en moyenne cette semaine contre ${t.avgPrior.toFixed(1)}h la semaine d'avant — à surveiller si ça continue.`
+    });
+  }
+
+  // 5ter. Régularité du sommeil
+  if(sleepStatsForTrend && sleepStatsForTrend.count >= 6 && sleepStatsForTrend.stdDev >= 1.3){
+    insights.push({ icon:'🌙', text: `Tes heures de sommeil varient beaucoup d'une nuit à l'autre (écart-type de ${sleepStatsForTrend.stdDev.toFixed(1)}h) — un rythme de coucher plus régulier aide souvent la récupération autant que la durée totale.` });
+  }
+
+  // 5quater. Dette de sommeil
+  if(sleepStatsForTrend && sleepStatsForTrend.count >= 6 && sleepStatsForTrend.pctUnder7 >= 50){
+    insights.push({ icon:'⚠️', text: `${sleepStatsForTrend.pctUnder7}% de tes nuits loguées sont sous les 7h (dont ${sleepStatsForTrend.under6} nuit(s) sous 6h) — une dette de sommeil qui s'accumule peut peser sur la récupération et le risque de blessure.` });
+  }
+
+  // 5quinquies. Jour de la semaine le moins reposant
+  const sleepWeekday = withSleep.length >= 6 ? sleepByWeekday(withSleep) : null;
+  if(sleepWeekday && sleepWeekday.bestAvg - sleepWeekday.worstAvg >= 1){
+    insights.push({ icon:'📅', text: `Tes nuits du ${sleepWeekday.worstDay} sont en moyenne les plus courtes (${sleepWeekday.worstAvg.toFixed(1)}h, contre ${sleepWeekday.bestAvg.toFixed(1)}h le ${sleepWeekday.bestDay}) — un créneau à anticiper si tu as une séance le lendemain.` });
   }
 
   // 6. Technique la plus dure
@@ -1662,6 +1727,50 @@ function renderProgress(){
     </div>`;
   }
 
+  let sleepSection = '';
+  const sleepStats = computeSleepStats(sorted);
+  if(sleepStats && sleepStats.count >= 2){
+    const sw = sleepStats.withSleep;
+    const w=300,h=110,pad=10;
+    const sMin = Math.min(4, Math.floor(sleepStats.min)-1);
+    const sMax = Math.max(9, Math.ceil(sleepStats.max)+1);
+    const spts = sw.map((e,i)=>{
+      const x = pad + (i/(Math.max(1,sw.length-1)))*(w-2*pad);
+      const y = h-pad - ((e.sleepHours - sMin)/(sMax-sMin))*(h-2*pad);
+      return {x,y,under:e.sleepHours<7};
+    });
+    const refY = h-pad - ((7 - sMin)/(sMax-sMin))*(h-2*pad);
+    const sLinePts = spts.map(p=>`${p.x},${p.y}`).join(' ');
+    const sDots = spts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${p.under?'#e07a5f':'#6b8fa3'}"/>`).join('');
+    const trendLine = sleepStats.trend ? (
+      Math.abs(sleepStats.trend.diff) >= 0.3
+        ? `<div class="tip-item"><div class="icon">${sleepStats.trend.diff>0?'📈':'📉'}</div><div class="body">${sleepStats.trend.diff>0 ? `En hausse : ${sleepStats.trend.avgRecent.toFixed(1)}h/nuit en moyenne cette semaine (vs ${sleepStats.trend.avgPrior.toFixed(1)}h la semaine d'avant).` : `En baisse : ${sleepStats.trend.avgRecent.toFixed(1)}h/nuit en moyenne cette semaine (vs ${sleepStats.trend.avgPrior.toFixed(1)}h la semaine d'avant).`}</div></div>`
+        : `<div class="tip-item"><div class="icon">➡️</div><div class="body">Stable sur les 2 dernières semaines, autour de ${sleepStats.trend.avgRecent.toFixed(1)}h/nuit.</div></div>`
+    ) : '';
+    sleepSection = `
+    <div class="card">
+      <div class="section-label">😴 Sommeil</div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="num">${sleepStats.avg.toFixed(1)}h</div><div class="lbl">Moyenne</div></div>
+        <div class="stat-box"><div class="num">${sleepStats.min}h–${sleepStats.max}h</div><div class="lbl">Min – Max</div></div>
+        <div class="stat-box"><div class="num">${sleepStats.pctUnder7}%</div><div class="lbl">Nuits sous 7h</div></div>
+        <div class="stat-box"><div class="num">${sleepStats.stdDev.toFixed(1)}h</div><div class="lbl">Écart-type (régularité)</div></div>
+      </div>
+      <div class="chart-wrap" style="margin-top:8px;"><svg viewBox="0 0 300 110">
+        <line x1="10" y1="${refY}" x2="290" y2="${refY}" stroke="#d9a441" stroke-width="1" stroke-dasharray="3 4"/>
+        <polyline points="${sLinePts}" fill="none" stroke="#6b8fa3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>
+        ${sDots}
+      </svg></div>
+      <div class="chart-caption">
+        <span>${sw[0].sleepHours}h — ${formatDate(sw[0].date)}</span>
+        <span style="color:var(--gold);">┄ repère 7h</span>
+        <span>${sw[sw.length-1].sleepHours}h — ${formatDate(sw[sw.length-1].date)}</span>
+      </div>
+      ${trendLine}
+      ${sleepStats.count < 6 ? `<div style="font-size:11px; color:var(--text-muted); margin-top:6px;">Continue à loguer ton sommeil pour affiner la régularité et les tendances (encore peu de nuits enregistrées).</div>` : ''}
+    </div>`;
+  }
+
   const streaks = computeStreaks(sorted);
   const winStreak = longestWinStreak(sorted);
   const maxWeek = mostSessionsInWeek(sorted);
@@ -1717,6 +1826,7 @@ function renderProgress(){
     </div>
     ${chart}
     ${feelingChart}
+    ${sleepSection}
     ${analysisSection}
     ${techniqueBreakdown}
     ${recordsSection}
