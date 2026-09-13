@@ -365,6 +365,7 @@ const GOALS_KEY = 'grit-goals';
 const HEALTH_KEY = 'grit-health';
 const NUTRITION_KEY = 'grit-nutrition';
 const NUTRITION_PROFILE_KEY = 'grit-nutrition-profile';
+const CHECKIN_KEY = 'grit-checkins';
 
 // ---- Suivi d'usage (opt-in) — remplis avec tes identifiants Supabase ----
 const SUPABASE_URL = 'https://scexqhoojtxlduahbtkc.supabase.co';
@@ -478,6 +479,9 @@ let nutritionLog = [];
 let nutritionForm = { notes:'', hydration:'', digestion:'Bien' };
 let nutritionProfile = { height:'', weightKg:'', age:'', sex:'homme', activity:'', goal:'maintien' };
 let nutritionCalcResult = null;
+let checkins = [];
+let checkinForm = { date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '' };
+let newMode = 'session';
 let painForm = { zone: '', intensity: 3, note: '' };
 let programDiscipline = 'BJJ';
 let generatedProgram = null;
@@ -506,6 +510,26 @@ async function loadEntries(){
 async function saveEntries(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
   catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+async function loadCheckins(){
+  try{
+    const v = localStorage.getItem(CHECKIN_KEY);
+    checkins = v ? JSON.parse(v) : [];
+  }catch(e){ checkins = []; }
+  render();
+}
+async function saveCheckins(){
+  try{ localStorage.setItem(CHECKIN_KEY, JSON.stringify(checkins)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+function resetCheckinForm(){
+  checkinForm = { date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '' };
+}
+// Fusionne séances et check-ins santé en une seule chronologie pour les métriques de bien-être (sommeil, poids, ressenti)
+function getWellnessEntries(){
+  const fromSessions = entries.map(e => ({ id:e.id, date:e.date, weight:e.weight, sleepHours:e.sleepHours, feeling:e.feeling, source:'session', discipline:e.discipline, type:e.type }));
+  const fromCheckins = checkins.map(c => ({ id:c.id, date:c.date, weight:c.weight, sleepHours:c.sleepHours, feeling:c.feeling, source:'checkin', discipline:null, type:null }));
+  return [...fromSessions, ...fromCheckins].sort((a,b) => a.date.localeCompare(b.date));
 }
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -686,7 +710,7 @@ function getWeeklyChallengeProgress(list){
 }
 
 function exportBackup(){
-  return JSON.stringify({ entries, goals, exportedAt: todayStr() }, null, 0);
+  return JSON.stringify({ entries, goals, checkins, exportedAt: todayStr() }, null, 0);
 }
 async function importBackup(text){
   try{
@@ -694,8 +718,10 @@ async function importBackup(text){
     if(!Array.isArray(data.entries)) throw new Error('format invalide');
     entries = data.entries;
     goals = Array.isArray(data.goals) ? data.goals : goals;
+    checkins = Array.isArray(data.checkins) ? data.checkins : checkins;
     await saveEntries();
     await saveGoals();
+    await saveCheckins();
     return true;
   }catch(e){ return false; }
 }
@@ -707,6 +733,8 @@ function daysSince(dateStr){
 }
 
 // ---- Coach GRIT : recommandations basées sur le ressenti et l'historique récent ----
+const PAIN_KEYWORDS = ['douleur','douloureux','mal au','mal à','mal aux','blessure','blessé','blessée','crampe','tendinite','entorse','claqu','épuisé','épuisée','surmené','surmenage'];
+
 function generateCoachMessage(entry, allEntriesBeforeSave){
   const sameDiscipline = allEntriesBeforeSave.filter(e => e.discipline === entry.discipline).sort((a,b)=>b.date.localeCompare(a.date));
   const lastTwoLow = [entry, ...sameDiscipline].slice(0,3).filter(e => e.feeling <= 2).length;
@@ -728,6 +756,38 @@ function generateCoachMessage(entry, allEntriesBeforeSave){
     icon = '🔥';
   }
 
+  // Technique(s) en difficulté ce jour précis
+  const strugglingTechs = (entry.techniques||[]).filter(t => t.feeling && t.feeling <= 2).map(t=>t.name);
+  if(strugglingTechs.length){
+    text += ` "${strugglingTechs[0]}" ressort comme un point dur aujourd'hui — reprends-la à charge réduite la prochaine fois, en isolant juste ce mouvement avant de l'enchaîner en situation.`;
+  }
+  const strongTechs = (entry.techniques||[]).filter(t => t.feeling && t.feeling >= 4).map(t=>t.name);
+  if(strongTechs.length && strugglingTechs.length === 0){
+    text += ` "${strongTechs[0]}" semble bien passer en ce moment — un bon candidat à approfondir pendant que la confiance est là.`;
+  }
+
+  // Évolution du poids vs la dernière entrée avec poids
+  const priorWithWeight = [...sameDiscipline, ...allEntriesBeforeSave].filter(e=>e.weight).sort((a,b)=>b.date.localeCompare(a.date))[0];
+  if(entry.weight && priorWithWeight){
+    const delta = entry.weight - priorWithWeight.weight;
+    if(Math.abs(delta) >= 1){
+      text += ` Côté poids : ${delta>0?'+':''}${delta.toFixed(1)}kg depuis ta dernière pesée du ${formatDate(priorWithWeight.date)} — ${Math.abs(delta)>=2 ? "un écart notable, vaut le coup de vérifier que c'est voulu." : "à surveiller si la tendance se confirme."}`;
+    }
+  }
+
+  // Objectif le plus proche : adapte le conseil (taper vs préparation)
+  const upcomingGoals = goals.filter(g => daysUntil(g.date) >= 0).sort((a,b)=> daysUntil(a.date)-daysUntil(b.date));
+  if(upcomingGoals.length){
+    const g = upcomingGoals[0];
+    const d = daysUntil(g.date);
+    if(d <= 7){
+      text += ` "${g.title}" arrive dans ${d} jour(s) — période à réduire le volume et prioriser fraîcheur et sommeil plutôt que d'ajouter de l'intensité.`;
+      icon = '🎯';
+    } else if(d <= 21 && lastTwoLow >= 2){
+      text += ` Il reste ${d} jours avant "${g.title}" — avec la fatigue accumulée en ce moment, mieux vaut absorber la charge maintenant que la reporter juste avant.`;
+    }
+  }
+
   if(lastTwoLow >= 2){
     text += " Attention : plusieurs séances récentes avec une jauge basse en " + entry.discipline + " — un vrai jour de repos pourrait payer plus qu'une séance de plus.";
     icon = '⚠️';
@@ -739,6 +799,61 @@ function generateCoachMessage(entry, allEntriesBeforeSave){
     } else if(entry.result.outcome === 'win'){
       text += " Victoire notée — regarde aussi ce qui a bien fonctionné pour le reproduire.";
     }
+  }
+
+  // Mots-clés de douleur/fatigue dans la note : priorité sécurité, passe devant le reste
+  const noteLower = (entry.note||'').toLowerCase();
+  if(PAIN_KEYWORDS.some(k => noteLower.includes(k))){
+    text += " Ta note mentionne une gêne ou de la fatigue — pense à la logguer précisément dans l'onglet Santé pour en suivre l'évolution, et n'hésite pas à consulter si ça persiste.";
+    icon = '🩹';
+  }
+
+  return { icon, text };
+}
+
+function generateCheckinCoachMessage(checkin, wellnessBefore){
+  let icon = '🩺';
+  let text = '';
+
+  if(checkin.feeling <= 2){
+    text = "Ressenti bas aujourd'hui. Priorise le repos et un sommeil complet cette nuit plutôt que de forcer une activité.";
+    icon = '🧊';
+  } else if(checkin.feeling === 3){
+    text = "Forme correcte. Une activité légère à modérée passera bien si tu en as envie.";
+    icon = '⚖️';
+  } else if(checkin.feeling === 4){
+    text = "Bonne forme — un bon moment pour une activité un peu plus soutenue si tu veux reprendre le sport.";
+    icon = '📈';
+  } else {
+    text = "Très bonne forme aujourd'hui ! Si tu cherches à reprendre une activité, c'est le bon jour pour t'y mettre.";
+    icon = '🔥';
+  }
+
+  const recentSleep = [...wellnessBefore, checkin].filter(e=>e.sleepHours).slice(-3);
+  if(recentSleep.length >= 3 && recentSleep.every(e=>e.sleepHours < 7)){
+    text += " Tes 3 derniers suivis montrent moins de 7h de sommeil — avant de penser intensité, la priorité est de rattraper ce déficit.";
+    icon = '😴';
+  }
+
+  const priorWithWeight = [...wellnessBefore].filter(e=>e.weight).sort((a,b)=>b.date.localeCompare(a.date))[0];
+  if(checkin.weight && priorWithWeight){
+    const delta = checkin.weight - priorWithWeight.weight;
+    if(Math.abs(delta) >= 1){
+      text += ` Côté poids : ${delta>0?'+':''}${delta.toFixed(1)}kg depuis le ${formatDate(priorWithWeight.date)} — ${Math.abs(delta)>=2 ? "un écart notable, vaut le coup de vérifier que c'est voulu." : "à surveiller si la tendance se confirme."}`;
+    }
+  }
+
+  const upcomingGoals = goals.filter(g => daysUntil(g.date) >= 0).sort((a,b)=> daysUntil(a.date)-daysUntil(b.date));
+  if(upcomingGoals.length){
+    const g = upcomingGoals[0];
+    const d = daysUntil(g.date);
+    text += ` Objectif "${g.title}" dans ${d} jour(s) — garde ce cap en tête pour tes prochains choix.`;
+  }
+
+  const noteLower = (checkin.note||'').toLowerCase();
+  if(PAIN_KEYWORDS.some(k => noteLower.includes(k))){
+    text += " Ta note mentionne une gêne ou de la fatigue — pense à la logguer dans l'onglet Santé pour en suivre l'évolution, et n'hésite pas à consulter si ça persiste.";
+    icon = '🩹';
   }
 
   return { icon, text };
@@ -812,45 +927,141 @@ function getFoodSuggestions(entry, recentNutrition){
   return suggestions;
 }
 
+// ---- Coach intelligent : croise sommeil, nutrition et charge d'entraînement, fonctionne avec ou sans séance sportive ----
+function generateSmartCoachAdvice(){
+  const wellness = getWellnessEntries();
+  const latest = wellness.length ? wellness[wellness.length-1] : null;
+  const sleepStats = computeSleepStats(wellness);
+  const nutrientNeeds = computeNutrientNeeds(nutritionProfile);
+  const recentNutrition = nutritionLog.filter(n => daysSince(n.date) <= 7);
+  const recentSessions = entries.filter(e => daysSince(e.date) <= 7);
+
+  const items = [];
+
+  // --- Sommeil : dette récente prioritaire sur le conseil générique ---
+  if(sleepStats){
+    const last3 = sleepStats.withSleep.slice(-3);
+    const debtWarning = last3.length >= 3 && last3.every(e => e.sleepHours < 7);
+    let sleepBody;
+    if(debtWarning){
+      sleepBody = `Tes 3 derniers suivis montrent moins de 7h de sommeil — une vraie dette s'installe. Vise 8-9h cette nuit, quitte à alléger l'intensité demain pour la récupérer.`;
+    } else if(latest && latest.feeling <= 2){
+      sleepBody = `Ressenti bas récemment : 8 à 9h cette nuit, avec une sieste courte dans la journée si possible.`;
+    } else if(latest && latest.feeling === 3){
+      sleepBody = `7 à 8h suffiront pour repartir sur de bonnes bases.`;
+    } else {
+      sleepBody = `7h minimum — même en pleine forme, ne sacrifie pas le sommeil, c'est là que la récupération se joue vraiment.`;
+    }
+    if(latest && latest.type === 'competition'){
+      sleepBody += ` Un combat sollicite aussi le système nerveux, pas seulement les muscles : ne rogne pas là-dessus.`;
+    }
+    items.push({ icon:'😴', title:'Sommeil', body: sleepBody });
+  } else {
+    items.push({ icon:'😴', title:'Sommeil', body: `Aucune donnée de sommeil pour l'instant — loggue-la sur une séance ou un suivi santé pour un conseil personnalisé.` });
+  }
+
+  // --- Hydratation : basée sur le dernier poids connu, séance ou check-in ---
+  const latestWithWeight = [...wellness].reverse().find(e => e.weight);
+  if(latestWithWeight){
+    let liters = latestWithWeight.weight * 0.035;
+    if(latest && latest.feeling >= 4) liters += 0.5;
+    if(latest && latest.type === 'competition') liters += 0.5;
+    items.push({ icon:'💧', title:'Hydratation', body: `Vise environ ${liters.toFixed(1)} L d'eau aujourd'hui, réparti dans la journée${latest && latest.source==='session' ? ', avec un bon verre juste après la séance' : ''}.` });
+  } else {
+    items.push({ icon:'💧', title:'Hydratation', body: `Bois régulièrement toute la journée. Renseigne ton poids sur une entrée pour une estimation personnalisée.` });
+  }
+
+  // --- Nutrition : croise le calculateur avec le journal réel ---
+  if(nutrientNeeds){
+    let nutriBody = `Ton objectif calculé : ${nutrientNeeds.calories} kcal/jour, dont ${nutrientNeeds.protein}g de protéines.`;
+    if(recentNutrition.length){
+      nutriBody += ` ${recentNutrition.length} repas loggé(s) cette semaine — pense à vérifier que tes apports en protéines suivent, surtout les jours d'entraînement.`;
+    } else {
+      nutriBody += ` Aucun repas loggé cette semaine dans le journal nutrition — ça aiderait à vérifier si tu atteins ces chiffres dans les faits.`;
+    }
+    items.push({ icon:'🍽️', title:'Nutrition', body: nutriBody });
+  } else {
+    items.push({ icon:'🍽️', title:'Nutrition', body: `Renseigne le calculateur de besoins (onglet Nutrition) pour un objectif calorique et de macros personnalisé, croisé avec ton activité réelle.` });
+  }
+
+  // --- Charge d'entraînement / reprise, y compris pour un profil non sportif ---
+  if(recentSessions.length >= 5){
+    items.push({ icon:'⚠️', title:"Charge d'entraînement", body: `${recentSessions.length} séances cette semaine — vérifie qu'un vrai jour de repos complet est prévu si ce n'est pas déjà le cas.` });
+  } else if(entries.length > 0 && recentSessions.length === 0){
+    items.push({ icon:'🔄', title:'Reprise', body: `Pas de séance loguée cette semaine. Une reprise en douceur aujourd'hui vaut mieux qu'attendre d'être à 100%.` });
+  } else if(entries.length === 0 && checkins.length > 0){
+    items.push({ icon:'🏃', title:'Reprise en douceur', body: `Tu suis déjà ta forme sans pratiquer de sport — c'est une bonne base. Pour reprendre, vise 2 séances courtes par semaine dans n'importe quelle activité qui te plaît, plutôt que de viser trop haut trop vite dès le départ.` });
+  }
+
+  const basedOnLabel = latest
+    ? (latest.source === 'session'
+        ? `D'après ta séance du ${formatDate(latest.date)} (${disciplineInfo(latest.discipline).emoji} ${latest.discipline})`
+        : `D'après ton suivi santé du ${formatDate(latest.date)}`)
+    : `Aucune donnée loguée pour l'instant`;
+
+  return { basedOnLabel, items };
+}
+
 function generateCoachSummary(){
   const sorted = [...entries].sort((a,b)=> b.date.localeCompare(a.date));
   const last7 = sorted.filter(e => daysSince(e.date) <= 7);
   const set = last7.length ? last7 : sorted.slice(0,5);
-  if(set.length === 0) return "Aucune séance loguée pour l'instant.";
-  const avgFeeling = (set.reduce((s,e)=>s+e.feeling,0)/set.length).toFixed(1);
-  const comps = set.filter(e=>e.type==='competition');
-  const wins = comps.filter(e=>e.result && e.result.outcome==='win').length;
-  const techCount = {};
-  set.forEach(e => (e.techniques||[]).forEach(t => { techCount[t.name]=(techCount[t.name]||0)+1; }));
-  const topTech = Object.entries(techCount).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([t])=>t);
-  const discSet = [...new Set(set.map(e=>e.discipline))];
+  const wellness = getWellnessEntries();
+  const sleepStats = computeSleepStats(wellness);
+  const nutrientNeeds = computeNutrientNeeds(nutritionProfile);
+  const recentCheckins = checkins.filter(c => daysSince(c.date) <= 7);
 
-  const recentNutrition = nutritionLog.filter(n => daysSince(n.date) <= 7);
-  const recentPain = healthLog.filter(p => daysSince(p.date) <= 14);
-  const analysis = generateAnalysis(sorted.slice().reverse());
+  if(set.length === 0 && recentCheckins.length === 0) return "Aucune séance ni suivi santé loguée pour l'instant.";
 
   let lines = [];
   lines.push(`═══ RÉSUMÉ GRIT ═══`);
-  lines.push(`Période : ${set.length} séance(s) sur les 7 derniers jours`);
-  lines.push(``);
-  lines.push(`📋 ENTRAÎNEMENT`);
-  lines.push(`Disciplines : ${discSet.join(', ')}`);
-  lines.push(`Jauge moyenne de ressenti : ${avgFeeling}/5`);
-  if(comps.length) lines.push(`Sparrings/combats : ${comps.length} (${wins} victoire(s))`);
-  if(topTech.length) lines.push(`Techniques travaillées : ${topTech.join(', ')}`);
-  const lastNote = set.find(e=>e.note);
-  if(lastNote) lines.push(`Dernière note : "${lastNote.note}"`);
 
-  if(recentNutrition.length){
+  if(set.length){
+    const avgFeeling = (set.reduce((s,e)=>s+e.feeling,0)/set.length).toFixed(1);
+    const comps = set.filter(e=>e.type==='competition');
+    const wins = comps.filter(e=>e.result && e.result.outcome==='win').length;
+    const techCount = {};
+    set.forEach(e => (e.techniques||[]).forEach(t => { techCount[t.name]=(techCount[t.name]||0)+1; }));
+    const topTech = Object.entries(techCount).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([t])=>t);
+    const discSet = [...new Set(set.map(e=>e.discipline))];
+
+    lines.push(`Période : ${set.length} séance(s) sur les 7 derniers jours`);
     lines.push(``);
-    lines.push(`🍽️ NUTRITION (7 derniers jours)`);
-    lines.push(`${recentNutrition.length} repas loggé(s)`);
-    const avgHydration = recentNutrition.filter(n=>n.hydration).length
-      ? (recentNutrition.filter(n=>n.hydration).reduce((s,n)=>s+n.hydration,0)/recentNutrition.filter(n=>n.hydration).length).toFixed(1)
-      : null;
-    if(avgHydration) lines.push(`Hydratation moyenne : ${avgHydration}L/jour`);
+    lines.push(`📋 ENTRAÎNEMENT`);
+    lines.push(`Disciplines : ${discSet.join(', ')}`);
+    lines.push(`Jauge moyenne de ressenti : ${avgFeeling}/5`);
+    if(comps.length) lines.push(`Sparrings/combats : ${comps.length} (${wins} victoire(s))`);
+    if(topTech.length) lines.push(`Techniques travaillées : ${topTech.join(', ')}`);
+    const lastNote = set.find(e=>e.note);
+    if(lastNote) lines.push(`Dernière note : "${lastNote.note}"`);
+  } else {
+    lines.push(`Aucune séance sportive cette semaine — ${recentCheckins.length} suivi(s) santé loggé(s).`);
   }
 
+  if(sleepStats){
+    lines.push(``);
+    lines.push(`😴 SOMMEIL`);
+    lines.push(`Moyenne : ${sleepStats.avg.toFixed(1)}h · ${sleepStats.pctUnder7}% des nuits sous 7h`);
+    if(sleepStats.trend && Math.abs(sleepStats.trend.diff) >= 0.3){
+      lines.push(`Tendance : ${sleepStats.trend.diff>0?'en hausse':'en baisse'} (${sleepStats.trend.avgRecent.toFixed(1)}h vs ${sleepStats.trend.avgPrior.toFixed(1)}h la semaine d'avant)`);
+    }
+  }
+
+  const recentNutrition = nutritionLog.filter(n => daysSince(n.date) <= 7);
+  if(recentNutrition.length || nutrientNeeds){
+    lines.push(``);
+    lines.push(`🍽️ NUTRITION (7 derniers jours)`);
+    if(nutrientNeeds) lines.push(`Objectif calculé : ${nutrientNeeds.calories} kcal/jour, ${nutrientNeeds.protein}g protéines`);
+    if(recentNutrition.length){
+      lines.push(`${recentNutrition.length} repas loggé(s)`);
+      const avgHydration = recentNutrition.filter(n=>n.hydration).length
+        ? (recentNutrition.filter(n=>n.hydration).reduce((s,n)=>s+n.hydration,0)/recentNutrition.filter(n=>n.hydration).length).toFixed(1)
+        : null;
+      if(avgHydration) lines.push(`Hydratation moyenne : ${avgHydration}L/jour`);
+    }
+  }
+
+  const recentPain = healthLog.filter(p => daysSince(p.date) <= 14);
   if(recentPain.length){
     lines.push(``);
     lines.push(`🩺 SANTÉ (14 derniers jours)`);
@@ -858,6 +1069,7 @@ function generateCoachSummary(){
     lines.push(`Gênes signalées : ${zones.join(', ')}`);
   }
 
+  const analysis = generateAnalysis(sorted.slice().reverse());
   if(analysis.length){
     lines.push(``);
     lines.push(`🔬 ANALYSE`);
@@ -914,24 +1126,22 @@ function renderAdvice(){
     </div>
   `;
 
-  const hero = last ? `
+  const smartCoach = generateSmartCoachAdvice();
+  const hero = smartCoach.items.length ? `
     <div class="advice-hero">
-      <div class="based-on">D'après ta séance du ${formatDate(last.date)} (${disciplineInfo(last.discipline).emoji} ${last.discipline})</div>
+      <div class="based-on">${smartCoach.basedOnLabel}</div>
+      ${smartCoach.items.map(it => `
       <div class="advice-row">
-        <div class="icon">😴</div>
-        <div><div class="title">Sommeil</div><div class="body">${getSleepAdvice(last)}</div></div>
-      </div>
-      <div class="advice-row">
-        <div class="icon">💧</div>
-        <div><div class="title">Hydratation</div><div class="body">${getHydrationAdvice(last)}</div></div>
-      </div>
+        <div class="icon">${it.icon}</div>
+        <div><div class="title">${it.title}</div><div class="body">${it.body}</div></div>
+      </div>`).join('')}
     </div>
   ` : `
     <div class="advice-hero">
-      <div class="based-on">Aucune séance loguée pour l'instant</div>
+      <div class="based-on">Aucune donnée loguée pour l'instant</div>
       <div class="advice-row">
         <div class="icon">💡</div>
-        <div><div class="body">Ajoute une première entrée dans l'onglet "Nouvelle" pour recevoir des conseils sommeil et hydratation adaptés à ton intensité.</div></div>
+        <div><div class="body">Ajoute une séance ou un suivi santé dans l'onglet "Nouvelle" pour recevoir des conseils sommeil, hydratation et nutrition adaptés.</div></div>
       </div>
     </div>
   `;
@@ -1302,7 +1512,49 @@ function renderWeeklyChallengeCard(){
 }
 
 function renderNew(){
+  const modeToggle = `
+  <div class="card" style="padding-bottom:14px;">
+    <div class="section-label">Que veux-tu enregistrer ?</div>
+    <div class="seg">
+      <button data-act="new-mode" data-val="session" class="${newMode==='session'?'active':''}">🥋 Séance sportive</button>
+      <button data-act="new-mode" data-val="checkin" class="${newMode==='checkin'?'active':''}">🩺 Suivi santé</button>
+    </div>
+    ${newMode==='checkin' ? `<div style="font-size:11.5px; color:var(--text-muted); margin-top:8px;">Pas de sport aujourd'hui ? Loggue juste ton sommeil, ton poids et ton ressenti général — pas besoin de discipline ni de séance.</div>` : ''}
+  </div>`;
+
+  if(newMode === 'checkin'){
+    return `
+    ${modeToggle}
+    ${renderCoachCard()}
+    <div class="card">
+      <div class="section-label">🩺 Suivi santé du jour</div>
+      <label>Date</label>
+      <input type="date" id="ci-date" value="${checkinForm.date}">
+
+      <label>Poids (kg) — optionnel</label>
+      <input type="number" step="0.1" id="ci-weight" placeholder="ex : 75.4" value="${checkinForm.weight}">
+
+      <label>Sommeil la nuit dernière (h) — optionnel</label>
+      <input type="number" step="0.5" id="ci-sleep" placeholder="ex : 7.5" value="${checkinForm.sleepHours}">
+
+      <label>Ressenti général</label>
+      <div class="fuel-row">
+        ${FUEL_LEVELS.map((f,i) => `<button data-act="ci-feeling" data-val="${i+1}" class="fuel-btn ${checkinForm.feeling==i+1?'active':''}" style="${checkinForm.feeling==i+1?`border-color:${f.color};color:${f.color}`:''}">
+          <span class="emoji">${f.emoji}</span>${i+1}
+        </button>`).join('')}
+      </div>
+      ${fuelBar(checkinForm.feeling)}
+
+      <label>Notes libres — optionnel</label>
+      <textarea id="ci-note" placeholder="Forme générale, fatigue, stress, tout ce qui compte pour toi...">${checkinForm.note}</textarea>
+
+      <button class="btn-primary" id="save-checkin-btn">Enregistrer le suivi</button>
+    </div>
+    `;
+  }
+
   return `
+  ${modeToggle}
   ${renderQuoteCard()}
   ${renderWeeklyChallengeCard()}
   ${renderThrowbackCard()}
@@ -1387,15 +1639,63 @@ function renderNew(){
 }
 
 function renderHistory(){
-  const filters = ['Toutes', ...DISCIPLINES.map(d=>d.name).filter(d => entries.some(e=>e.discipline===d))];
-  const filtered = historyFilter==='Toutes' ? entries : entries.filter(e=>e.discipline===historyFilter);
+  const filters = ['Toutes', ...DISCIPLINES.map(d=>d.name).filter(d => entries.some(e=>e.discipline===d)), ...(checkins.length ? ['🩺 Suivi santé'] : [])];
   const filterRow = `<div class="filter-row">${filters.map(f => `<button class="filter-chip ${historyFilter===f?'active':''}" data-act="filter" data-val="${f}">${f}</button>`).join('')}</div>`;
 
-  if(filtered.length === 0){
+  if(historyFilter === '🩺 Suivi santé'){
+    if(checkins.length === 0){
+      return `${filterRow}<div class="card"><div class="empty">Aucun suivi santé enregistré.<br>Ajoute-en un dans l'onglet "Nouvelle" (mode Suivi santé).</div></div>`;
+    }
+    const sortedCheckins = [...checkins].sort((a,b)=> b.date.localeCompare(a.date));
+    return `${filterRow}<div class="card">${sortedCheckins.map(c => {
+      const fuel = FUEL_LEVELS[c.feeling-1];
+      return `
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-date">${formatDate(c.date)}</span>
+          <div class="entry-tags"><span class="tag" style="background:#6b8fa322; color:#6b8fa3">🩺 Suivi santé</span></div>
+        </div>
+        <div class="entry-stats">
+          ${c.weight ? `<span><b>${c.weight}</b> kg</span>` : ''}
+          ${c.sleepHours ? `<span>😴 <b>${c.sleepHours}h</b></span>` : ''}
+          <span>${fuel.emoji} <b style="color:${fuel.color}">${c.feeling}/5</b></span>
+        </div>
+        ${c.note ? `<div class="entry-note">${escapeHtml(c.note)}</div>` : ''}
+        <button class="del-btn" data-act="delete-checkin" data-id="${c.id}">Supprimer</button>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  const filtered = historyFilter==='Toutes' ? entries : entries.filter(e=>e.discipline===historyFilter);
+  const showCheckinsToo = historyFilter === 'Toutes' && checkins.length > 0;
+
+  if(filtered.length === 0 && !showCheckinsToo){
     return `${filterRow}<div class="card"><div class="empty">Aucune séance enregistrée${historyFilter!=='Toutes' ? ' pour '+historyFilter : ''}.<br>Ajoute ta première entrée dans l'onglet "Nouvelle".</div></div>`;
   }
-  const sorted = [...filtered].sort((a,b)=> b.date.localeCompare(a.date));
-  return `${filterRow}<div class="card">${sorted.map(e => {
+  const sessionItems = filtered.map(e => ({ kind:'session', date:e.date, data:e }));
+  const checkinItems = showCheckinsToo ? checkins.map(c => ({ kind:'checkin', date:c.date, data:c })) : [];
+  const sorted = [...sessionItems, ...checkinItems].sort((a,b)=> b.date.localeCompare(a.date));
+
+  return `${filterRow}<div class="card">${sorted.map(item => {
+    if(item.kind === 'checkin'){
+      const c = item.data;
+      const fuel = FUEL_LEVELS[c.feeling-1];
+      return `
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-date">${formatDate(c.date)}</span>
+          <div class="entry-tags"><span class="tag" style="background:#6b8fa322; color:#6b8fa3">🩺 Suivi santé</span></div>
+        </div>
+        <div class="entry-stats">
+          ${c.weight ? `<span><b>${c.weight}</b> kg</span>` : ''}
+          ${c.sleepHours ? `<span>😴 <b>${c.sleepHours}h</b></span>` : ''}
+          <span>${fuel.emoji} <b style="color:${fuel.color}">${c.feeling}/5</b></span>
+        </div>
+        ${c.note ? `<div class="entry-note">${escapeHtml(c.note)}</div>` : ''}
+        <button class="del-btn" data-act="delete-checkin" data-id="${c.id}">Supprimer</button>
+      </div>`;
+    }
+    const e = item.data;
     const disc = disciplineInfo(e.discipline);
     const fuel = FUEL_LEVELS[e.feeling-1];
     const outcomeColor = e.result ? (e.result.outcome==='win'?'var(--green)':e.result.outcome==='loss'?'var(--coral)':'var(--text-muted)') : '';
@@ -1578,7 +1878,8 @@ function sleepByWeekday(withSleep){
 
 function generateAnalysis(sorted){
   const insights = [];
-  if(sorted.length < 5) return insights;
+  const wellnessCount = getWellnessEntries().filter(e=>e.sleepHours).length;
+  if(sorted.length < 5 && wellnessCount < 5) return insights;
 
   // 1. Tendance récente du ressenti (14 derniers jours vs 14 précédents)
   const recent = sorted.filter(e => daysSince(e.date) <= 14);
@@ -1635,8 +1936,8 @@ function generateAnalysis(sorted){
     }
   }
 
-  // 5. Lien sommeil / ressenti
-  const withSleep = sorted.filter(e=>e.sleepHours);
+  // 5. Lien sommeil / ressenti (séances + suivis santé confondus)
+  const withSleep = getWellnessEntries().filter(e=>e.sleepHours);
   if(withSleep.length >= 5){
     const lowSleep = withSleep.filter(e=>e.sleepHours < 7);
     const goodSleep = withSleep.filter(e=>e.sleepHours >= 7);
@@ -1644,13 +1945,13 @@ function generateAnalysis(sorted){
       const avgLow = lowSleep.reduce((s,e)=>s+e.feeling,0)/lowSleep.length;
       const avgGood = goodSleep.reduce((s,e)=>s+e.feeling,0)/goodSleep.length;
       if(avgGood - avgLow >= 0.3){
-        insights.push({ icon:'😴', text: `Tes séances après une nuit de 7h+ ont une jauge moyenne de ${avgGood.toFixed(1)}/5, contre ${avgLow.toFixed(1)}/5 après moins de 7h — le sommeil compte visiblement beaucoup pour toi.` });
+        insights.push({ icon:'😴', text: `Après une nuit de 7h+, ton ressenti moyen est de ${avgGood.toFixed(1)}/5, contre ${avgLow.toFixed(1)}/5 après moins de 7h — le sommeil compte visiblement beaucoup pour toi.` });
       }
     }
   }
 
   // 5bis. Tendance du sommeil (7 derniers jours vs 7 précédents)
-  const sleepStatsForTrend = computeSleepStats(sorted);
+  const sleepStatsForTrend = computeSleepStats(getWellnessEntries());
   if(sleepStatsForTrend && sleepStatsForTrend.trend && Math.abs(sleepStatsForTrend.trend.diff) >= 0.5){
     const t = sleepStatsForTrend.trend;
     insights.push({
@@ -1696,14 +1997,15 @@ function generateAnalysis(sorted){
 }
 
 function renderProgress(){
-  if(entries.length === 0){
-    return `<div class="card"><div class="empty">Pas encore assez de données.<br>Ajoute des séances pour voir ta progression.</div></div>`;
+  const wellness = getWellnessEntries();
+  if(entries.length === 0 && checkins.length === 0){
+    return `<div class="card"><div class="empty">Pas encore assez de données.<br>Ajoute une séance ou un suivi santé pour voir ta progression.</div></div>`;
   }
   const sorted = [...entries].sort((a,b)=> a.date.localeCompare(b.date));
-  const withWeight = sorted.filter(e => e.weight);
+  const withWeight = wellness.filter(e => e.weight);
   const comps = sorted.filter(e => e.type==='competition');
   const wins = comps.filter(e => e.result && e.result.outcome==='win').length;
-  const avgFeeling = (sorted.reduce((s,e)=> s+Number(e.feeling),0) / sorted.length).toFixed(1);
+  const avgFeeling = sorted.length ? (sorted.reduce((s,e)=> s+Number(e.feeling),0) / sorted.length).toFixed(1) : '–';
 
   const byDiscipline = {};
   sorted.forEach(e => { byDiscipline[e.discipline] = (byDiscipline[e.discipline]||0)+1; });
@@ -1767,10 +2069,10 @@ function renderProgress(){
   }
 
   let feelingChart = '';
-  if(sorted.length >= 2){
+  if(wellness.length >= 2){
     const w=300,h=110,pad=10;
-    const fpts = sorted.map((e,i)=>{
-      const x = pad + (i/(sorted.length-1))*(w-2*pad);
+    const fpts = wellness.map((e,i)=>{
+      const x = pad + (i/(wellness.length-1))*(w-2*pad);
       const y = h-pad - ((e.feeling-1)/4)*(h-2*pad);
       return {x,y,color: FUEL_LEVELS[e.feeling-1].color};
     });
@@ -1785,14 +2087,14 @@ function renderProgress(){
         ${dots}
       </svg></div>
       <div class="chart-caption">
-        <span>${FUEL_LEVELS[sorted[0].feeling-1].emoji} ${formatDate(sorted[0].date)}</span>
-        <span>${FUEL_LEVELS[sorted[sorted.length-1].feeling-1].emoji} ${formatDate(sorted[sorted.length-1].date)}</span>
+        <span>${FUEL_LEVELS[wellness[0].feeling-1].emoji} ${formatDate(wellness[0].date)}</span>
+        <span>${FUEL_LEVELS[wellness[wellness.length-1].feeling-1].emoji} ${formatDate(wellness[wellness.length-1].date)}</span>
       </div>
     </div>`;
   }
 
   let sleepSection = '';
-  const sleepStats = computeSleepStats(sorted);
+  const sleepStats = computeSleepStats(wellness);
   if(sleepStats && sleepStats.count >= 2){
     const sw = sleepStats.withSleep;
     const w=300,h=110,pad=10;
@@ -1835,38 +2137,65 @@ function renderProgress(){
     </div>`;
   }
 
-  const streaks = computeStreaks(sorted);
-  const winStreak = longestWinStreak(sorted);
-  const maxWeek = mostSessionsInWeek(sorted);
-  const unlockedIds = getUnlockedBadgeIds(sorted);
-  const rank = getRankInfo(sorted);
-
-  const streakSection = `
-    <div class="stat-grid">
-      <div class="stat-box"><div class="num">🔥 ${streaks.current}</div><div class="lbl">Série en cours (jours)</div></div>
-      <div class="stat-box"><div class="num">🚀 ${streaks.best}</div><div class="lbl">Meilleure série (jours)</div></div>
-    </div>`;
-
-  const recordsSection = `
+  let sessionSection = '';
+  let sportSpecificSection = `
     <div class="card">
-      <div class="section-label">🏅 Records personnels</div>
-      <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px;"><span>Plus de séances en 7 jours</span><b class="mono" style="color:var(--gold)">${maxWeek}</b></div>
-      <div style="display:flex; justify-content:space-between; padding:8px 0;"><span>Plus longue série de victoires</span><b class="mono" style="color:var(--green)">${winStreak}</b></div>
+      <div style="font-size:13px; color:var(--text-muted);">Loggue une séance sportive pour débloquer le rang, les badges et les records — le suivi santé seul te donne déjà le sommeil, le poids et le ressenti ci-dessus.</div>
     </div>`;
+  if(entries.length > 0){
+    const streaks = computeStreaks(sorted);
+    const winStreak = longestWinStreak(sorted);
+    const maxWeek = mostSessionsInWeek(sorted);
+    const unlockedIds = getUnlockedBadgeIds(sorted);
+    const rank = getRankInfo(sorted);
 
-  const badgesSection = `
-    <div class="card">
-      <div class="section-label">🎖️ Badges</div>
-      <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:10px;">
-        ${BADGE_DEFS.map(b => {
-          const on = unlockedIds.has(b.id);
-          return `<div style="text-align:center; padding:10px 4px; border-radius:12px; border:1.5px solid ${on?'var(--gold)':'var(--border)'}; background:${on?'rgba(242,181,68,0.1)':'var(--surface-2)'}; opacity:${on?1:0.4};">
-            <div style="font-size:22px;">${b.emoji}</div>
-            <div style="font-size:9.5px; font-family:'IBM Plex Mono',monospace; margin-top:4px; color:${on?'var(--text)':'var(--text-muted)'};">${b.title}</div>
-          </div>`;
-        }).join('')}
+    const streakSection = `
+      <div class="stat-grid">
+        <div class="stat-box"><div class="num">🔥 ${streaks.current}</div><div class="lbl">Série en cours (jours)</div></div>
+        <div class="stat-box"><div class="num">🚀 ${streaks.best}</div><div class="lbl">Meilleure série (jours)</div></div>
+      </div>`;
+
+    const recordsSection = `
+      <div class="card">
+        <div class="section-label">🏅 Records personnels</div>
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px;"><span>Plus de séances en 7 jours</span><b class="mono" style="color:var(--gold)">${maxWeek}</b></div>
+        <div style="display:flex; justify-content:space-between; padding:8px 0;"><span>Plus longue série de victoires</span><b class="mono" style="color:var(--green)">${winStreak}</b></div>
+      </div>`;
+
+    const badgesSection = `
+      <div class="card">
+        <div class="section-label">🎖️ Badges</div>
+        <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:10px;">
+          ${BADGE_DEFS.map(b => {
+            const on = unlockedIds.has(b.id);
+            return `<div style="text-align:center; padding:10px 4px; border-radius:12px; border:1.5px solid ${on?'var(--gold)':'var(--border)'}; background:${on?'rgba(242,181,68,0.1)':'var(--surface-2)'}; opacity:${on?1:0.4};">
+              <div style="font-size:22px;">${b.emoji}</div>
+              <div style="font-size:9.5px; font-family:'IBM Plex Mono',monospace; margin-top:4px; color:${on?'var(--text)':'var(--text-muted)'};">${b.title}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+
+    sessionSection = `
+      ${renderRankCard(rank)}
+      ${streakSection}
+      <div class="stat-grid">
+        <div class="stat-box"><div class="num">${sorted.length}</div><div class="lbl">📋 Séances loguées</div></div>
+        <div class="stat-box"><div class="num">${avgFeeling}</div><div class="lbl">⚙️ Jauge moyenne /5</div></div>
+        <div class="stat-box"><div class="num">${comps.length}</div><div class="lbl">🏆 Matchs / compét</div></div>
+        <div class="stat-box"><div class="num">${wins}</div><div class="lbl">🏆 Victoires</div></div>
+      </div>`;
+
+    sportSpecificSection = `
+      ${techniqueBreakdown}
+      ${recordsSection}
+      ${badgesSection}
+      <div class="card">
+        <div class="section-label">Répartition par discipline</div>
+        ${disciplineBreakdown}
       </div>
-    </div>`;
+    `;
+  }
 
   const analysis = generateAnalysis(sorted);
   const analysisSection = analysis.length ? `
@@ -1876,29 +2205,16 @@ function renderProgress(){
     </div>` : `
     <div class="card">
       <div class="section-label">🔬 Analyse poussée</div>
-      <div style="font-size:13px; color:var(--text-muted);">Pas encore assez de données pour une analyse fiable — reviens ici après quelques séances de plus.</div>
+      <div style="font-size:13px; color:var(--text-muted);">Pas encore assez de données pour une analyse fiable — reviens ici après quelques séances ou suivis de plus.</div>
     </div>`;
 
   return `
-    ${renderRankCard(rank)}
-    ${streakSection}
-    <div class="stat-grid">
-      <div class="stat-box"><div class="num">${sorted.length}</div><div class="lbl">📋 Séances loguées</div></div>
-      <div class="stat-box"><div class="num">${avgFeeling}</div><div class="lbl">⚙️ Jauge moyenne /5</div></div>
-      <div class="stat-box"><div class="num">${comps.length}</div><div class="lbl">🏆 Matchs / compét</div></div>
-      <div class="stat-box"><div class="num">${wins}</div><div class="lbl">🏆 Victoires</div></div>
-    </div>
+    ${sessionSection}
     ${chart}
     ${feelingChart}
     ${sleepSection}
     ${analysisSection}
-    ${techniqueBreakdown}
-    ${recordsSection}
-    ${badgesSection}
-    <div class="card">
-      <div class="section-label">Répartition par discipline</div>
-      ${disciplineBreakdown}
-    </div>
+    ${sportSpecificSection}
   `;
 }
 
@@ -1932,6 +2248,37 @@ function attachHandlers(){
   document.querySelectorAll('[data-act="discipline"]').forEach(b => b.onclick = () => { form.discipline = b.dataset.val; render(); });
   document.querySelectorAll('[data-act="type"]').forEach(b => b.onclick = () => { form.type = b.dataset.val; render(); });
   document.querySelectorAll('[data-act="feeling"]').forEach(b => b.onclick = () => { form.feeling = Number(b.dataset.val); render(); });
+  document.querySelectorAll('[data-act="new-mode"]').forEach(b => b.onclick = () => { newMode = b.dataset.val; render(); });
+  document.querySelectorAll('[data-act="ci-feeling"]').forEach(b => b.onclick = () => { checkinForm.feeling = Number(b.dataset.val); render(); });
+  const ciDateEl = document.getElementById('ci-date');
+  const ciWeightEl = document.getElementById('ci-weight');
+  const ciSleepEl = document.getElementById('ci-sleep');
+  const ciNoteEl = document.getElementById('ci-note');
+  if(ciDateEl) ciDateEl.oninput = e => checkinForm.date = e.target.value;
+  if(ciWeightEl) ciWeightEl.oninput = e => checkinForm.weight = e.target.value;
+  if(ciSleepEl) ciSleepEl.oninput = e => checkinForm.sleepHours = e.target.value;
+  if(ciNoteEl) ciNoteEl.oninput = e => checkinForm.note = e.target.value;
+  const saveCheckinBtn = document.getElementById('save-checkin-btn');
+  if(saveCheckinBtn) saveCheckinBtn.onclick = async () => {
+    const checkin = {
+      id: uid(),
+      date: checkinForm.date || todayStr(),
+      weight: checkinForm.weight ? Number(checkinForm.weight) : null,
+      sleepHours: checkinForm.sleepHours ? Number(checkinForm.sleepHours) : null,
+      feeling: checkinForm.feeling,
+      note: checkinForm.note.trim()
+    };
+    const wellnessBefore = getWellnessEntries();
+    const coach = generateCheckinCoachMessage(checkin, wellnessBefore);
+    checkins.push(checkin);
+    await saveCheckins();
+    trackEvent('checkin_logged', { feeling: checkin.feeling });
+    lastCoach = coach;
+    resetCheckinForm();
+    showToast('Suivi enregistré 💾');
+    render();
+    window.scrollTo({top:0, behavior:'smooth'});
+  };
   document.querySelectorAll('[data-act="outcome"]').forEach(b => b.onclick = () => { form.outcome = b.dataset.val; render(); });
   document.querySelectorAll('[data-act="filter"]').forEach(b => b.onclick = () => { historyFilter = b.dataset.val; render(); });
   document.querySelectorAll('[data-act="delete"]').forEach(b => b.onclick = async () => {
@@ -1939,6 +2286,12 @@ function attachHandlers(){
     await saveEntries();
     render();
     showToast('Entrée supprimée');
+  });
+  document.querySelectorAll('[data-act="delete-checkin"]').forEach(b => b.onclick = async () => {
+    checkins = checkins.filter(c => c.id !== b.dataset.id);
+    await saveCheckins();
+    render();
+    showToast('Suivi supprimé');
   });
   document.querySelectorAll('[data-act="delete-goal"]').forEach(b => b.onclick = async () => {
     goals = goals.filter(g => g.id !== b.dataset.id);
@@ -2186,6 +2539,7 @@ function startApp(){
   loadHealth().then(render);
   loadNutrition().then(render);
   loadNutritionProfile().then(render);
+  loadCheckins().then(render);
   trackEvent('session_start', {});
 }
 
