@@ -1378,6 +1378,7 @@ function renderSettings(){
 
 function renderRankCard(rank){
   const pips = Array.from({length:4}, (_,i) => `<span style="flex:1; height:8px; border-radius:2px; background:${i<rank.division || rank.legend ? 'var(--gold)' : 'var(--surface-2)'}; border:1px solid var(--border);"></span>`).join('');
+  const divPct = rank.legend ? 100 : Math.min(100, (rank.xpIntoDivision/DIV_XP)*100);
   return `
   <div class="card" style="background:linear-gradient(135deg, ${rank.tier.color}22, transparent); border-color:${rank.tier.color}55;">
     <div class="section-label">🏔️ Rang GRIT</div>
@@ -1389,6 +1390,9 @@ function renderRankCard(rank){
       </div>
     </div>
     <div style="display:flex; gap:5px; margin-top:12px;">${pips}</div>
+    <div style="height:6px; border-radius:4px; background:var(--surface-2); overflow:hidden; margin-top:8px;">
+      <div style="height:100%; width:${divPct}%; border-radius:4px; background:linear-gradient(90deg, ${rank.tier.color}, var(--gold)); transition:width 0.4s ease;"></div>
+    </div>
     ${!rank.legend ? `<div style="font-size:11px; color:var(--text-muted); margin-top:6px; font-family:'IBM Plex Mono',monospace;">${rank.xpIntoDivision}/${DIV_XP} XP avant la prochaine division</div>` : `<div style="font-size:11px; color:var(--gold); margin-top:6px; font-family:'IBM Plex Mono',monospace;">Niveau maximum atteint — continue pour le prestige 🏆</div>`}
     <div style="font-size:11px; color:var(--text-muted); margin-top:10px; opacity:0.75;">Rang virtuel GRIT basé sur ta régularité — indépendant de tout classement officiel.</div>
   </div>`;
@@ -1507,7 +1511,9 @@ function renderWeeklyChallengeCard(){
     <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
       <div style="font-size:13.5px;">${done ? '✅ Défi complété !' : `${wc.count}/${wc.target} séances loguées`}</div>
     </div>
-    <div class="fuel-bar" style="height:8px;"><span style="flex:${wc.count}; background:${done?'var(--green)':'var(--gold)'};"></span><span style="flex:${Math.max(0,wc.target-wc.count)}; background:transparent;"></span></div>
+    <div style="height:10px; border-radius:6px; background:var(--surface-2); overflow:hidden;">
+      <div style="height:100%; width:${pct}%; border-radius:6px; background:${done?'linear-gradient(90deg, var(--green), #4fd8a8)':'linear-gradient(90deg, var(--gold), #f2c268)'}; transition:width 0.4s ease; ${done?'box-shadow:0 0 8px rgba(47,179,128,0.5);':''}"></div>
+    </div>
   </div>`;
 }
 
@@ -2043,24 +2049,15 @@ function renderProgress(){
   if(withWeight.length >= 2){
     const weights = withWeight.map(e=>Number(e.weight));
     const min = Math.min(...weights)-0.5, max = Math.max(...weights)+0.5;
-    const w=300,h=110,pad=10;
-    const pts = withWeight.map((e,i)=>{
-      const x = pad + (i/(withWeight.length-1))*(w-2*pad);
-      const y = h-pad - ((Number(e.weight)-min)/(max-min))*(h-2*pad);
-      return `${x},${y}`;
-    }).join(' ');
-    const areaPts = `${pad},${h-pad} ${pts} ${w-pad},${h-pad}`;
+    const w=300,h=126,pad=14;
+    const pts = withWeight.map((e,i)=>({
+      x: pad + (i/(withWeight.length-1))*(w-2*pad),
+      y: h-pad - ((Number(e.weight)-min)/(max-min))*(h-2*pad)
+    }));
     chart = `
     <div class="card">
       <div class="section-label">⚖️ Évolution du poids</div>
-      <div class="chart-wrap"><svg viewBox="0 0 300 110">
-        <defs><linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#d9a441" stop-opacity="0.35"/>
-          <stop offset="100%" stop-color="#d9a441" stop-opacity="0"/>
-        </linearGradient></defs>
-        <polygon points="${areaPts}" fill="url(#wgrad)"/>
-        <polyline points="${pts}" fill="none" stroke="#d9a441" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-      </svg></div>
+      <div class="chart-wrap">${buildChartSvg(pts, { w,h,pad, color:'#e0a422', gradId:'wgrad' })}</div>
       <div class="chart-caption">
         <span>${withWeight[0].weight} kg — ${formatDate(withWeight[0].date)}</span>
         <span>${withWeight[withWeight.length-1].weight} kg — ${formatDate(withWeight[withWeight.length-1].date)}</span>
@@ -2070,22 +2067,16 @@ function renderProgress(){
 
   let feelingChart = '';
   if(wellness.length >= 2){
-    const w=300,h=110,pad=10;
-    const fpts = wellness.map((e,i)=>{
-      const x = pad + (i/(wellness.length-1))*(w-2*pad);
-      const y = h-pad - ((e.feeling-1)/4)*(h-2*pad);
-      return {x,y,color: FUEL_LEVELS[e.feeling-1].color};
-    });
-    const linePts = fpts.map(p=>`${p.x},${p.y}`).join(' ');
-    const dots = fpts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${p.color}"/>`).join('');
+    const w=300,h=126,pad=14;
+    const fpts = wellness.map((e,i)=>({
+      x: pad + (i/(wellness.length-1))*(w-2*pad),
+      y: h-pad - ((e.feeling-1)/4)*(h-2*pad),
+      color: FUEL_LEVELS[e.feeling-1].color
+    }));
     feelingChart = `
     <div class="card">
       <div class="section-label">⚙️ Évolution du ressenti</div>
-      <div class="chart-wrap"><svg viewBox="0 0 300 110">
-        <line x1="10" y1="55" x2="290" y2="55" stroke="#33383f" stroke-width="1" stroke-dasharray="3 4"/>
-        <polyline points="${linePts}" fill="none" stroke="#3f9d94" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>
-        ${dots}
-      </svg></div>
+      <div class="chart-wrap">${buildChartSvg(fpts, { w,h,pad, color:'#2f8f8a', gradId:'fgrad' })}</div>
       <div class="chart-caption">
         <span>${FUEL_LEVELS[wellness[0].feeling-1].emoji} ${formatDate(wellness[0].date)}</span>
         <span>${FUEL_LEVELS[wellness[wellness.length-1].feeling-1].emoji} ${formatDate(wellness[wellness.length-1].date)}</span>
@@ -2097,17 +2088,15 @@ function renderProgress(){
   const sleepStats = computeSleepStats(wellness);
   if(sleepStats && sleepStats.count >= 2){
     const sw = sleepStats.withSleep;
-    const w=300,h=110,pad=10;
+    const w=300,h=126,pad=14;
     const sMin = Math.min(4, Math.floor(sleepStats.min)-1);
     const sMax = Math.max(9, Math.ceil(sleepStats.max)+1);
-    const spts = sw.map((e,i)=>{
-      const x = pad + (i/(Math.max(1,sw.length-1)))*(w-2*pad);
-      const y = h-pad - ((e.sleepHours - sMin)/(sMax-sMin))*(h-2*pad);
-      return {x,y,under:e.sleepHours<7};
-    });
+    const spts = sw.map((e,i)=>({
+      x: pad + (i/(Math.max(1,sw.length-1)))*(w-2*pad),
+      y: h-pad - ((e.sleepHours - sMin)/(sMax-sMin))*(h-2*pad),
+      color: e.sleepHours < 7 ? '#e5383b' : '#6b8fa3'
+    }));
     const refY = h-pad - ((7 - sMin)/(sMax-sMin))*(h-2*pad);
-    const sLinePts = spts.map(p=>`${p.x},${p.y}`).join(' ');
-    const sDots = spts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${p.under?'#e07a5f':'#6b8fa3'}"/>`).join('');
     const trendLine = sleepStats.trend ? (
       Math.abs(sleepStats.trend.diff) >= 0.3
         ? `<div class="tip-item"><div class="icon">${sleepStats.trend.diff>0?'📈':'📉'}</div><div class="body">${sleepStats.trend.diff>0 ? `En hausse : ${sleepStats.trend.avgRecent.toFixed(1)}h/nuit en moyenne cette semaine (vs ${sleepStats.trend.avgPrior.toFixed(1)}h la semaine d'avant).` : `En baisse : ${sleepStats.trend.avgRecent.toFixed(1)}h/nuit en moyenne cette semaine (vs ${sleepStats.trend.avgPrior.toFixed(1)}h la semaine d'avant).`}</div></div>`
@@ -2122,11 +2111,7 @@ function renderProgress(){
         <div class="stat-box"><div class="num">${sleepStats.pctUnder7}%</div><div class="lbl">Nuits sous 7h</div></div>
         <div class="stat-box"><div class="num">${sleepStats.stdDev.toFixed(1)}h</div><div class="lbl">Écart-type (régularité)</div></div>
       </div>
-      <div class="chart-wrap" style="margin-top:8px;"><svg viewBox="0 0 300 110">
-        <line x1="10" y1="${refY}" x2="290" y2="${refY}" stroke="#d9a441" stroke-width="1" stroke-dasharray="3 4"/>
-        <polyline points="${sLinePts}" fill="none" stroke="#6b8fa3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>
-        ${sDots}
-      </svg></div>
+      <div class="chart-wrap" style="margin-top:10px;">${buildChartSvg(spts, { w,h,pad, color:'#6b8fa3', gradId:'sgrad', refLineY:refY, refLineColor:'#e0a422' })}</div>
       <div class="chart-caption">
         <span>${sw[0].sleepHours}h — ${formatDate(sw[0].date)}</span>
         <span style="color:var(--gold);">┄ repère 7h</span>
@@ -2218,6 +2203,53 @@ function renderProgress(){
   `;
 }
 
+// ---- Graphiques : courbe lissée + dégradé, style unifié pour Progression ----
+function catmullRomToBezierPath(points){
+  if(points.length < 2) return '';
+  if(points.length === 2) return `M${points[0].x},${points[0].y} L${points[1].x},${points[1].y}`;
+  let d = `M${points[0].x},${points[0].y}`;
+  for(let i=0;i<points.length-1;i++){
+    const p0 = points[i-1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i+1];
+    const p3 = points[i+2] || p2;
+    const cp1x = p1.x + (p2.x - p0.x)/6;
+    const cp1y = p1.y + (p2.y - p0.y)/6;
+    const cp2x = p2.x - (p3.x - p1.x)/6;
+    const cp2y = p2.y - (p3.y - p1.y)/6;
+    d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+function buildChartSvg(points, opts){
+  const { w=300, h=126, pad=14, color='#e0a422', gradId='chartgrad', fillOpacity=0.24, refLineY=null, refLineColor='#e0a422' } = opts;
+  const linePath = catmullRomToBezierPath(points);
+  const last = points[points.length-1], first = points[0];
+  const areaPath = `${linePath} L${last.x.toFixed(1)},${(h-pad).toFixed(1)} L${first.x.toFixed(1)},${(h-pad).toFixed(1)} Z`;
+  const gridLines = [0.22,0.5,0.78].map(f => {
+    const y = (pad + f*(h-2*pad)).toFixed(1);
+    return `<line x1="${pad}" y1="${y}" x2="${w-pad}" y2="${y}" stroke="var(--border)" stroke-width="1"/>`;
+  }).join('');
+  const refLine = refLineY!==null ? `<line x1="${pad}" y1="${refLineY.toFixed(1)}" x2="${w-pad}" y2="${refLineY.toFixed(1)}" stroke="${refLineColor}" stroke-width="1.3" stroke-dasharray="4 4" opacity="0.6"/>` : '';
+  const dots = points.map((p,i) => {
+    const isLast = i===points.length-1;
+    const dotColor = p.color || color;
+    return isLast
+      ? `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${dotColor}" stroke="var(--surface)" stroke-width="2"/>`
+      : `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="var(--surface)" stroke="${dotColor}" stroke-width="2"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${w} ${h}">
+    <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${color}" stop-opacity="${fillOpacity}"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${gridLines}
+    ${refLine}
+    <path d="${areaPath}" fill="url(#${gradId})"/>
+    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2.75" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+  </svg>`;
+}
 function formatDate(d){
   const [y,m,day] = d.split('-');
   const months = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
