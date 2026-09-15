@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>GRIT</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#e0a422">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="GRIT">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
@@ -238,6 +244,14 @@
 
   .chart-wrap svg{ width:100%; height: auto; display:block; }
   .chart-caption{ font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-muted); margin-top: 8px; display:flex; justify-content: space-between; }
+  .ring-row{ display:flex; gap:16px; overflow-x:auto; padding:6px 2px 10px; -webkit-overflow-scrolling:touch; }
+  .ring-item{ display:flex; flex-direction:column; align-items:center; gap:7px; flex-shrink:0; }
+  .ring-wrap{ position:relative; width:68px; height:68px; }
+  .ring-wrap svg{ transform: rotate(-90deg); }
+  .ring-center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; }
+  .ring-center .val{ font-size:13px; font-weight:600; color:var(--text); line-height:1.1; }
+  .ring-center .emoji{ font-size:18px; line-height:1; }
+  .ring-label{ font-size:10px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; text-align:center; white-space:nowrap; }
 
   .del-btn{ background:none; border:none; color: var(--text-muted); font-family:'IBM Plex Mono', monospace; font-size: 11px; cursor:pointer; text-decoration: underline; padding: 0; margin-top: 8px; }
 
@@ -392,6 +406,76 @@ async function trackEvent(eventType, payload){
     });
   }catch(e){ /* silencieux — le suivi ne doit jamais bloquer l'usage de l'app */ }
 }
+
+// ---- Rappels quotidiens (notifications push) ----
+const VAPID_PUBLIC_KEY = 'BO2Q9ecgG6Ht8m8VrVdoYevoHdwhqRY1wtamYcQ4q3BSfKCyBC-fDzt9fsczoCHLv_OR1n2OqRzcS0JNUVRUS9Y';
+const PUSH_ENABLED_KEY = 'grit-push-enabled';
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw = atob(base64);
+  const output = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) output[i] = raw.charCodeAt(i);
+  return output;
+}
+async function registerServiceWorker(){
+  if(!('serviceWorker' in navigator)) return null;
+  try{ return await navigator.serviceWorker.register('/sw.js'); }
+  catch(e){ console.error('SW registration failed', e); return null; }
+}
+function pushSupported(){
+  return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
+}
+async function enableDailyReminders(){
+  if(!pushSupported()){
+    showToast("Les notifications ne sont pas supportées sur cet appareil ou ce navigateur");
+    return false;
+  }
+  const permission = await Notification.requestPermission();
+  if(permission !== 'granted'){
+    showToast("Notifications refusées — tu peux les autoriser dans les réglages du téléphone");
+    return false;
+  }
+  try{
+    const reg = await registerServiceWorker();
+    if(!reg) throw new Error('no service worker');
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    const subJson = sub.toJSON();
+    await fetch(`${SUPABASE_URL}/rest/v1/grit_push_subscriptions?on_conflict=endpoint`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Prefer': 'resolution=ignore-duplicates'
+      },
+      body: JSON.stringify({ endpoint: subJson.endpoint, p256dh: subJson.keys.p256dh, auth: subJson.keys.auth })
+    });
+    localStorage.setItem(PUSH_ENABLED_KEY, '1');
+    return true;
+  }catch(e){
+    console.error('Push subscription failed', e);
+    showToast("Impossible d'activer les rappels pour le moment");
+    return false;
+  }
+}
+async function disableDailyReminders(){
+  try{
+    if('serviceWorker' in navigator){
+      const reg = await navigator.serviceWorker.getRegistration();
+      if(reg){
+        const sub = await reg.pushManager.getSubscription();
+        if(sub) await sub.unsubscribe();
+      }
+    }
+  }catch(e){ /* on retire quand même la préférence locale */ }
+  localStorage.removeItem(PUSH_ENABLED_KEY);
+}
+
 const DISCIPLINES = [
   {name:'BJJ', emoji:'🥋', color:'#e2532d'},
   {name:'MMA', emoji:'🥊', color:'#d9a441'},
@@ -1351,7 +1435,21 @@ function getRankInfo(list){
 function rankKey(r){ return r.legend ? 'legend' : `${r.tierIndex}-${r.division}`; }
 
 function renderSettings(){
+  const pushOn = localStorage.getItem(PUSH_ENABLED_KEY) === '1';
+  const notifSupported = pushSupported();
   return `
+    <div class="card">
+      <div class="section-label">🔔 Rappel quotidien</div>
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Reçois une notification chaque jour pour ne pas oublier de loguer ta séance ou ton suivi santé.</div>
+      ${!notifSupported ? `
+        <div style="font-size:12.5px; color:var(--text-muted);">Les notifications ne sont pas supportées sur cet appareil ou ce navigateur. Sur iPhone, ajoute d'abord GRIT à l'écran d'accueil (icône partager → "Sur l'écran d'accueil"), puis réessaie depuis l'app installée.</div>
+      ` : pushOn ? `
+        <div style="font-size:13px; color:var(--green); font-weight:600; margin-bottom:8px;">✅ Rappels activés</div>
+        <button class="btn-secondary" id="disable-push-btn">Désactiver</button>
+      ` : `
+        <button class="btn-primary" id="enable-push-btn">🔔 Activer les rappels</button>
+      `}
+    </div>
     <div class="card">
       <div class="section-label">💾 Sauvegarde de tes données</div>
       <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Exporte toutes tes données (séances, objectifs) en texte, à garder de côté. Utile si jamais la sauvegarde automatique a un souci.</div>
@@ -2047,17 +2145,18 @@ function renderProgress(){
 
   let chart = '';
   if(withWeight.length >= 2){
+    const w=300,h=120,pad=14;
     const weights = withWeight.map(e=>Number(e.weight));
-    const min = Math.min(...weights)-0.5, max = Math.max(...weights)+0.5;
-    const w=300,h=126,pad=14;
-    const pts = withWeight.map((e,i)=>({
+    const min = Math.min(...weights), max = Math.max(...weights);
+    const range = Math.max(0.5, max-min);
+    const pts = withWeight.map((e,i) => ({
       x: pad + (i/(withWeight.length-1))*(w-2*pad),
-      y: h-pad - ((Number(e.weight)-min)/(max-min))*(h-2*pad)
+      y: h-pad - ((Number(e.weight)-min)/range)*(h-2*pad)
     }));
     chart = `
     <div class="card">
       <div class="section-label">⚖️ Évolution du poids</div>
-      <div class="chart-wrap">${buildChartSvg(pts, { w,h,pad, color:'#e0a422', gradId:'wgrad' })}</div>
+      <div class="chart-wrap">${buildSimpleLineChart(pts, { w,h,pad, color:'#e0a422' })}</div>
       <div class="chart-caption">
         <span>${withWeight[0].weight} kg — ${formatDate(withWeight[0].date)}</span>
         <span>${withWeight[withWeight.length-1].weight} kg — ${formatDate(withWeight[withWeight.length-1].date)}</span>
@@ -2067,8 +2166,8 @@ function renderProgress(){
 
   let feelingChart = '';
   if(wellness.length >= 2){
-    const w=300,h=126,pad=14;
-    const fpts = wellness.map((e,i)=>({
+    const w=300,h=120,pad=14;
+    const fpts = wellness.map((e,i) => ({
       x: pad + (i/(wellness.length-1))*(w-2*pad),
       y: h-pad - ((e.feeling-1)/4)*(h-2*pad),
       color: FUEL_LEVELS[e.feeling-1].color
@@ -2076,7 +2175,7 @@ function renderProgress(){
     feelingChart = `
     <div class="card">
       <div class="section-label">⚙️ Évolution du ressenti</div>
-      <div class="chart-wrap">${buildChartSvg(fpts, { w,h,pad, color:'#2f8f8a', gradId:'fgrad' })}</div>
+      <div class="chart-wrap">${buildSimpleLineChart(fpts, { w,h,pad, color:'#2f8f8a' })}</div>
       <div class="chart-caption">
         <span>${FUEL_LEVELS[wellness[0].feeling-1].emoji} ${formatDate(wellness[0].date)}</span>
         <span>${FUEL_LEVELS[wellness[wellness.length-1].feeling-1].emoji} ${formatDate(wellness[wellness.length-1].date)}</span>
@@ -2088,10 +2187,10 @@ function renderProgress(){
   const sleepStats = computeSleepStats(wellness);
   if(sleepStats && sleepStats.count >= 2){
     const sw = sleepStats.withSleep;
-    const w=300,h=126,pad=14;
+    const w=300,h=120,pad=14;
     const sMin = Math.min(4, Math.floor(sleepStats.min)-1);
     const sMax = Math.max(9, Math.ceil(sleepStats.max)+1);
-    const spts = sw.map((e,i)=>({
+    const spts = sw.map((e,i) => ({
       x: pad + (i/(Math.max(1,sw.length-1)))*(w-2*pad),
       y: h-pad - ((e.sleepHours - sMin)/(sMax-sMin))*(h-2*pad),
       color: e.sleepHours < 7 ? '#e5383b' : '#6b8fa3'
@@ -2111,7 +2210,7 @@ function renderProgress(){
         <div class="stat-box"><div class="num">${sleepStats.pctUnder7}%</div><div class="lbl">Nuits sous 7h</div></div>
         <div class="stat-box"><div class="num">${sleepStats.stdDev.toFixed(1)}h</div><div class="lbl">Écart-type (régularité)</div></div>
       </div>
-      <div class="chart-wrap" style="margin-top:10px;">${buildChartSvg(spts, { w,h,pad, color:'#6b8fa3', gradId:'sgrad', refLineY:refY, refLineColor:'#e0a422' })}</div>
+      <div class="chart-wrap" style="margin-top:10px;">${buildSimpleLineChart(spts, { w,h,pad, color:'#6b8fa3', refLineY:refY, refLineColor:'#e0a422' })}</div>
       <div class="chart-caption">
         <span>${sw[0].sleepHours}h — ${formatDate(sw[0].date)}</span>
         <span style="color:var(--gold);">┄ repère 7h</span>
@@ -2203,50 +2302,47 @@ function renderProgress(){
   `;
 }
 
-// ---- Graphiques : courbe lissée + dégradé, style unifié pour Progression ----
-function catmullRomToBezierPath(points){
-  if(points.length < 2) return '';
-  if(points.length === 2) return `M${points[0].x},${points[0].y} L${points[1].x},${points[1].y}`;
-  let d = `M${points[0].x},${points[0].y}`;
-  for(let i=0;i<points.length-1;i++){
-    const p0 = points[i-1] || points[i];
-    const p1 = points[i];
-    const p2 = points[i+1];
-    const p3 = points[i+2] || p2;
-    const cp1x = p1.x + (p2.x - p0.x)/6;
-    const cp1y = p1.y + (p2.y - p0.y)/6;
-    const cp2x = p2.x - (p3.x - p1.x)/6;
-    const cp2y = p2.y - (p3.y - p1.y)/6;
-    d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-  }
-  return d;
+// ---- Graphiques : jauges circulaires groupées par semaine, style unifié pour Progression ----
+function getWeekStart(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const day = d.getDay();
+  const diffToMonday = (day===0 ? -6 : 1-day);
+  d.setDate(d.getDate()+diffToMonday);
+  return d.toISOString().slice(0,10);
 }
-function buildChartSvg(points, opts){
-  const { w=300, h=126, pad=14, color='#e0a422', gradId='chartgrad', fillOpacity=0.24, refLineY=null, refLineColor='#e0a422' } = opts;
-  const linePath = catmullRomToBezierPath(points);
-  const last = points[points.length-1], first = points[0];
-  const areaPath = `${linePath} L${last.x.toFixed(1)},${(h-pad).toFixed(1)} L${first.x.toFixed(1)},${(h-pad).toFixed(1)} Z`;
-  const gridLines = [0.22,0.5,0.78].map(f => {
+function groupByWeek(list, valueKey){
+  const map = {};
+  list.forEach(e=>{
+    if(e[valueKey]===null || e[valueKey]===undefined) return;
+    const wk = getWeekStart(e.date);
+    if(!map[wk]) map[wk] = [];
+    map[wk].push(Number(e[valueKey]));
+  });
+  return Object.entries(map)
+    .sort((a,b)=> a[0].localeCompare(b[0]))
+    .map(([weekStart, vals]) => ({
+      weekStart,
+      avg: vals.reduce((s,v)=>s+v,0)/vals.length,
+      count: vals.length
+    }));
+}
+function buildSimpleLineChart(points, opts){
+  const { w=300, h=120, pad=14, color='#e0a422', refLineY=null, refLineColor='#e0a422' } = opts;
+  const gridLines = [0.25,0.5,0.75].map(f => {
     const y = (pad + f*(h-2*pad)).toFixed(1);
     return `<line x1="${pad}" y1="${y}" x2="${w-pad}" y2="${y}" stroke="var(--border)" stroke-width="1"/>`;
   }).join('');
-  const refLine = refLineY!==null ? `<line x1="${pad}" y1="${refLineY.toFixed(1)}" x2="${w-pad}" y2="${refLineY.toFixed(1)}" stroke="${refLineColor}" stroke-width="1.3" stroke-dasharray="4 4" opacity="0.6"/>` : '';
+  const refLine = refLineY!==null ? `<line x1="${pad}" y1="${refLineY.toFixed(1)}" x2="${w-pad}" y2="${refLineY.toFixed(1)}" stroke="${refLineColor}" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.6"/>` : '';
+  const linePts = points.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
   const dots = points.map((p,i) => {
     const isLast = i===points.length-1;
     const dotColor = p.color || color;
-    return isLast
-      ? `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${dotColor}" stroke="var(--surface)" stroke-width="2"/>`
-      : `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="var(--surface)" stroke="${dotColor}" stroke-width="2"/>`;
+    return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isLast?4.5:3}" fill="${dotColor}"${isLast?'':' stroke="var(--surface)" stroke-width="1.5"'}/>`;
   }).join('');
   return `<svg viewBox="0 0 ${w} ${h}">
-    <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${color}" stop-opacity="${fillOpacity}"/>
-      <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-    </linearGradient></defs>
     ${gridLines}
     ${refLine}
-    <path d="${areaPath}" fill="url(#${gradId})"/>
-    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2.75" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
     ${dots}
   </svg>`;
 }
@@ -2455,6 +2551,20 @@ function attachHandlers(){
     else { showToast('Format invalide — vérifie le texte collé'); }
   };
 
+  const enablePushBtn = document.getElementById('enable-push-btn');
+  if(enablePushBtn) enablePushBtn.onclick = async () => {
+    enablePushBtn.textContent = 'Activation...';
+    const ok = await enableDailyReminders();
+    if(ok) showToast('Rappels quotidiens activés 🔔');
+    render();
+  };
+  const disablePushBtn = document.getElementById('disable-push-btn');
+  if(disablePushBtn) disablePushBtn.onclick = async () => {
+    await disableDailyReminders();
+    showToast('Rappels désactivés');
+    render();
+  };
+
   const askResetBtn = document.getElementById('ask-reset-btn');
   if(askResetBtn) askResetBtn.onclick = () => { resetConfirm = true; render(); };
   const cancelResetBtn = document.getElementById('cancel-reset-btn');
@@ -2572,6 +2682,7 @@ function startApp(){
   loadNutrition().then(render);
   loadNutritionProfile().then(render);
   loadCheckins().then(render);
+  registerServiceWorker();
   trackEvent('session_start', {});
 }
 
