@@ -560,7 +560,7 @@ let entries = [];
 let goals = [];
 let healthLog = [];
 let nutritionLog = [];
-let nutritionForm = { notes:'', hydration:'', digestion:'Bien' };
+let nutritionForm = { notes:'', hydration:'', digestion:'Bien', proteinG:'' };
 let nutritionProfile = { height:'', weightKg:'', age:'', sex:'homme', activity:'', goal:'maintien' };
 let nutritionCalcResult = null;
 let checkins = [];
@@ -1058,8 +1058,19 @@ function generateSmartCoachAdvice(){
   // --- Nutrition : croise le calculateur avec le journal réel ---
   if(nutrientNeeds){
     let nutriBody = `Ton objectif calculé : ${nutrientNeeds.calories} kcal/jour, dont ${nutrientNeeds.protein}g de protéines.`;
-    if(recentNutrition.length){
-      nutriBody += ` ${recentNutrition.length} repas loggé(s) cette semaine — pense à vérifier que tes apports en protéines suivent, surtout les jours d'entraînement.`;
+    const withProtein = recentNutrition.filter(n => n.proteinG);
+    if(withProtein.length){
+      const avgProtein = Math.round(withProtein.reduce((s,n)=>s+n.proteinG,0) / withProtein.length);
+      const pct = Math.round((avgProtein / nutrientNeeds.protein) * 100);
+      if(pct < 85){
+        nutriBody += ` Moyenne loguée sur ${withProtein.length} jour(s) : ${avgProtein}g (${pct}% de ta cible) — en dessous, essaie d'ajouter une source de protéines à un repas.`;
+      } else if(pct > 115){
+        nutriBody += ` Moyenne loguée sur ${withProtein.length} jour(s) : ${avgProtein}g (${pct}% de ta cible) — largement couvert.`;
+      } else {
+        nutriBody += ` Moyenne loguée sur ${withProtein.length} jour(s) : ${avgProtein}g (${pct}% de ta cible) — bien aligné.`;
+      }
+    } else if(recentNutrition.length){
+      nutriBody += ` ${recentNutrition.length} repas loggé(s) cette semaine — renseigne les grammes de protéines pour voir si tu atteins réellement cet objectif.`;
     } else {
       nutriBody += ` Aucun repas loggé cette semaine dans le journal nutrition — ça aiderait à vérifier si tu atteins ces chiffres dans les faits.`;
     }
@@ -1258,6 +1269,7 @@ function renderAdvice(){
     <div class="entry">
       <div class="entry-top">
         <span class="entry-date">${formatDate(n.date)}</span>
+        ${n.proteinG ? `<span class="tag" style="background:#e5383b1a; color:var(--coral)">🥩 ${n.proteinG}g</span>` : ''}
         ${n.hydration ? `<span class="tag" style="background:#3ec9c022; color:var(--teal)">💧 ${n.hydration}L</span>` : ''}
       </div>
       ${n.digestion ? `<div style="font-size:12.5px; color:var(--text-muted);">Digestion : ${escapeHtml(n.digestion)}</div>` : ''}
@@ -1317,6 +1329,17 @@ function renderAdvice(){
         <div class="stat-box"><div class="num">${nutritionLog.length}</div><div class="lbl">📋 Repas loggés</div></div>
         <div class="stat-box"><div class="num">${nutritionLog.length && nutritionLog[nutritionLog.length-1].hydration ? nutritionLog[nutritionLog.length-1].hydration : '—'}</div><div class="lbl">💧 Dernière hydratation (L)</div></div>
       </div>
+      ${(() => {
+        const recentProtein = nutritionLog.filter(n => daysSince(n.date) <= 7 && n.proteinG);
+        if(!recentProtein.length) return '';
+        const avgProtein = Math.round(recentProtein.reduce((s,n)=>s+n.proteinG,0) / recentProtein.length);
+        const target = nutritionCalcResult ? nutritionCalcResult.protein : (computeNutrientNeeds(nutritionProfile) ? computeNutrientNeeds(nutritionProfile).protein : null);
+        const pct = target ? Math.round((avgProtein/target)*100) : null;
+        return `<div class="stat-grid" style="margin-bottom:12px;">
+          <div class="stat-box"><div class="num">${avgProtein}g</div><div class="lbl">🥩 Protéines moy. (7j)</div></div>
+          <div class="stat-box"><div class="num">${pct !== null ? pct+'%' : '—'}</div><div class="lbl">🎯 % de ta cible</div></div>
+        </div>`;
+      })()}
       ${last ? `
       <div class="section-label" style="margin-top:4px;">🥗 Aliments à privilégier pour toi</div>
       ${getFoodSuggestions(last, nutritionLog).map(s => `<div class="tip-item"><div class="icon">${s.icon}</div><div class="body"><b>${s.title}</b> — ${s.body}</div></div>`).join('')}
@@ -1361,6 +1384,8 @@ function renderAdvice(){
 
       <label style="margin-top:16px;">Alimentation du jour</label>
       <textarea id="nutrition-notes" placeholder="ex : petit-déj léger, bon appétit le midi, repas post-training...">${escapeHtml(nutritionForm.notes)}</textarea>
+      <label>Protéines estimées (g)</label>
+      <input type="number" step="1" id="nutrition-protein" placeholder="ex : 140" value="${nutritionForm.proteinG}">
       <label>Hydratation (L)</label>
       <input type="number" step="0.1" id="nutrition-hydration" value="${nutritionForm.hydration}">
       <label>Digestion</label>
@@ -2477,8 +2502,10 @@ function attachHandlers(){
 
   const nutritionNotesEl = document.getElementById('nutrition-notes');
   const nutritionHydrationEl = document.getElementById('nutrition-hydration');
+  const nutritionProteinEl = document.getElementById('nutrition-protein');
   if(nutritionNotesEl) nutritionNotesEl.oninput = e => nutritionForm.notes = e.target.value;
   if(nutritionHydrationEl) nutritionHydrationEl.oninput = e => nutritionForm.hydration = e.target.value;
+  if(nutritionProteinEl) nutritionProteinEl.oninput = e => nutritionForm.proteinG = e.target.value;
   document.querySelectorAll('[data-act="nutrition-digestion"]').forEach(b => b.onclick = () => { nutritionForm.digestion = b.dataset.val; render(); });
   document.querySelectorAll('[data-act="delete-nutrition"]').forEach(b => b.onclick = async () => {
     nutritionLog = nutritionLog.filter(n => n.id !== b.dataset.id);
@@ -2488,10 +2515,10 @@ function attachHandlers(){
   });
   const addNutritionBtn = document.getElementById('add-nutrition-btn');
   if(addNutritionBtn) addNutritionBtn.onclick = async () => {
-    if(!nutritionForm.notes.trim() && !nutritionForm.hydration){ showToast('Ajoute au moins une note ou une hydratation'); return; }
-    nutritionLog.push({ id: uid(), date: todayStr(), notes: nutritionForm.notes.trim(), hydration: nutritionForm.hydration ? Number(nutritionForm.hydration) : null, digestion: nutritionForm.digestion });
+    if(!nutritionForm.notes.trim() && !nutritionForm.hydration && !nutritionForm.proteinG){ showToast('Ajoute au moins une note, des protéines ou une hydratation'); return; }
+    nutritionLog.push({ id: uid(), date: todayStr(), notes: nutritionForm.notes.trim(), hydration: nutritionForm.hydration ? Number(nutritionForm.hydration) : null, proteinG: nutritionForm.proteinG ? Number(nutritionForm.proteinG) : null, digestion: nutritionForm.digestion });
     await saveNutrition();
-    nutritionForm = { notes:'', hydration:'', digestion:'Bien' };
+    nutritionForm = { notes:'', hydration:'', digestion:'Bien', proteinG:'' };
     showToast('Repas enregistré 🍽️');
     render();
   };
