@@ -6,7 +6,7 @@
 <title>GRIT</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#e0a422">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="GRIT">
@@ -380,6 +380,77 @@ const HEALTH_KEY = 'grit-health';
 const NUTRITION_KEY = 'grit-nutrition';
 const NUTRITION_PROFILE_KEY = 'grit-nutrition-profile';
 const CHECKIN_KEY = 'grit-checkins';
+const LANG_KEY = 'grit-lang';
+let currentLang = localStorage.getItem(LANG_KEY) || 'fr';
+
+const I18N = {
+  fr: {
+    tagline: 'TRAIN · TRACK · GRIND',
+    tab_new: 'Nouvelle', tab_history: 'Historique', tab_progress: 'Progression', tab_advice: 'Conseils', tab_settings: 'Réglages',
+    settings_lang_title: '🌐 Langue',
+    settings_lang_desc: "Choisis la langue de l'application.",
+    settings_reminders_title: '🔔 Rappel quotidien',
+    settings_reminders_desc: 'Reçois une notification chaque jour pour ne pas oublier de loguer ta séance ou ton suivi santé.',
+    settings_reminders_unsupported: 'Les notifications ne sont pas supportées sur cet appareil ou ce navigateur. Sur iPhone, ajoute d\'abord GRIT à l\'écran d\'accueil (icône partager → "Sur l\'écran d\'accueil"), puis réessaie depuis l\'app installée.',
+    settings_reminders_on: '✅ Rappels activés',
+    settings_reminders_disable: 'Désactiver',
+    settings_reminders_enable: '🔔 Activer les rappels',
+    settings_backup_title: '💾 Sauvegarde de tes données',
+    settings_backup_desc: 'Exporte toutes tes données (séances, objectifs) en texte, à garder de côté. Utile si jamais la sauvegarde automatique a un souci.',
+    settings_export_btn: '📤 Exporter mes données',
+    settings_copy_btn: 'Copier',
+    settings_restore_label: 'Restaurer depuis une sauvegarde',
+    settings_import_placeholder: 'Colle ici le texte exporté précédemment...',
+    settings_import_btn: '📥 Restaurer',
+    settings_reset_title: '🗑️ Réinitialiser',
+    settings_reset_desc: 'Supprime toutes tes séances, objectifs et douleurs loguées. Utile en cas de souci technique — pense à exporter avant si tu veux garder une trace.',
+    settings_reset_confirm: 'Es-tu sûr ? Cette action est irréversible.',
+    settings_reset_confirm_btn: 'Oui, tout effacer',
+    settings_reset_cancel_btn: 'Annuler',
+    settings_reset_ask_btn: 'Réinitialiser mes données'
+  },
+  en: {
+    tagline: 'TRAIN · TRACK · GRIND',
+    tab_new: 'New', tab_history: 'History', tab_progress: 'Progress', tab_advice: 'Advice', tab_settings: 'Settings',
+    settings_lang_title: '🌐 Language',
+    settings_lang_desc: 'Choose the app language.',
+    settings_reminders_title: '🔔 Daily reminder',
+    settings_reminders_desc: "Get a notification every day so you don't forget to log your session or health check-in.",
+    settings_reminders_unsupported: 'Notifications are not supported on this device or browser. On iPhone, first add GRIT to your home screen (share icon → "Add to Home Screen"), then try again from the installed app.',
+    settings_reminders_on: '✅ Reminders enabled',
+    settings_reminders_disable: 'Disable',
+    settings_reminders_enable: '🔔 Enable reminders',
+    settings_backup_title: '💾 Back up your data',
+    settings_backup_desc: 'Export all your data (sessions, goals) as text, to keep as a backup. Useful if the automatic backup ever has an issue.',
+    settings_export_btn: '📤 Export my data',
+    settings_copy_btn: 'Copy',
+    settings_restore_label: 'Restore from a backup',
+    settings_import_placeholder: 'Paste your previously exported text here...',
+    settings_import_btn: '📥 Restore',
+    settings_reset_title: '🗑️ Reset',
+    settings_reset_desc: 'Deletes all your logged sessions, goals and pain entries. Useful in case of a technical issue — remember to export first if you want to keep a copy.',
+    settings_reset_confirm: 'Are you sure? This action cannot be undone.',
+    settings_reset_confirm_btn: 'Yes, delete everything',
+    settings_reset_cancel_btn: 'Cancel',
+    settings_reset_ask_btn: 'Reset my data'
+  }
+};
+function t(key){ return (I18N[currentLang] && I18N[currentLang][key]) || I18N.fr[key] || key; }
+function applyStaticTranslations(){
+  const tag = document.querySelector('.brand-text p');
+  if(tag) tag.textContent = t('tagline');
+  const tabNew = document.querySelector('.tab[data-tab="new"]');
+  const tabHistory = document.querySelector('.tab[data-tab="history"]');
+  const tabProgress = document.querySelector('.tab[data-tab="progress"]');
+  const tabAdvice = document.querySelector('.tab[data-tab="advice"]');
+  const tabSettings = document.querySelector('.tab[data-tab="settings"]');
+  if(tabNew) tabNew.innerHTML = `<span class="tab-emoji">📝</span>${t('tab_new')}`;
+  if(tabHistory) tabHistory.innerHTML = `<span class="tab-emoji">📋</span>${t('tab_history')}`;
+  if(tabProgress) tabProgress.innerHTML = `<span class="tab-emoji">📈</span>${t('tab_progress')}`;
+  if(tabAdvice) tabAdvice.innerHTML = `<span class="tab-emoji">💡</span>${t('tab_advice')}`;
+  if(tabSettings) tabSettings.innerHTML = `<span class="tab-emoji">⚙️</span>${t('tab_settings')}`;
+  document.documentElement.lang = currentLang;
+}
 
 // ---- Suivi d'usage (opt-in) — remplis avec tes identifiants Supabase ----
 const SUPABASE_URL = 'https://scexqhoojtxlduahbtkc.supabase.co';
@@ -1464,36 +1535,44 @@ function renderSettings(){
   const notifSupported = pushSupported();
   return `
     <div class="card">
-      <div class="section-label">🔔 Rappel quotidien</div>
-      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Reçois une notification chaque jour pour ne pas oublier de loguer ta séance ou ton suivi santé.</div>
+      <div class="section-label">${t('settings_lang_title')}</div>
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">${t('settings_lang_desc')}</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-secondary" data-act="set-lang" data-val="fr" style="flex:1; ${currentLang==='fr' ? 'border-color:var(--coral); color:var(--coral); background:rgba(255,90,69,0.08);' : ''}">🇫🇷 Français</button>
+        <button class="btn-secondary" data-act="set-lang" data-val="en" style="flex:1; ${currentLang==='en' ? 'border-color:var(--coral); color:var(--coral); background:rgba(255,90,69,0.08);' : ''}">🇬🇧 English</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-label">${t('settings_reminders_title')}</div>
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">${t('settings_reminders_desc')}</div>
       ${!notifSupported ? `
-        <div style="font-size:12.5px; color:var(--text-muted);">Les notifications ne sont pas supportées sur cet appareil ou ce navigateur. Sur iPhone, ajoute d'abord GRIT à l'écran d'accueil (icône partager → "Sur l'écran d'accueil"), puis réessaie depuis l'app installée.</div>
+        <div style="font-size:12.5px; color:var(--text-muted);">${t('settings_reminders_unsupported')}</div>
       ` : pushOn ? `
-        <div style="font-size:13px; color:var(--green); font-weight:600; margin-bottom:8px;">✅ Rappels activés</div>
-        <button class="btn-secondary" id="disable-push-btn">Désactiver</button>
+        <div style="font-size:13px; color:var(--green); font-weight:600; margin-bottom:8px;">${t('settings_reminders_on')}</div>
+        <button class="btn-secondary" id="disable-push-btn">${t('settings_reminders_disable')}</button>
       ` : `
-        <button class="btn-primary" id="enable-push-btn">🔔 Activer les rappels</button>
+        <button class="btn-primary" id="enable-push-btn">${t('settings_reminders_enable')}</button>
       `}
     </div>
     <div class="card">
-      <div class="section-label">💾 Sauvegarde de tes données</div>
-      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Exporte toutes tes données (séances, objectifs) en texte, à garder de côté. Utile si jamais la sauvegarde automatique a un souci.</div>
-      <button class="btn-secondary" id="export-btn">📤 Exporter mes données</button>
+      <div class="section-label">${t('settings_backup_title')}</div>
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">${t('settings_backup_desc')}</div>
+      <button class="btn-secondary" id="export-btn">${t('settings_export_btn')}</button>
       <textarea id="export-box" readonly style="display:none; min-height:100px; font-family:'IBM Plex Mono',monospace; font-size:10.5px;"></textarea>
-      <button class="btn-secondary" id="copy-export-btn" style="display:none;">Copier</button>
-      <label style="margin-top:16px;">Restaurer depuis une sauvegarde</label>
-      <textarea id="import-box" placeholder="Colle ici le texte exporté précédemment..."></textarea>
-      <button class="btn-secondary" id="import-btn">📥 Restaurer</button>
+      <button class="btn-secondary" id="copy-export-btn" style="display:none;">${t('settings_copy_btn')}</button>
+      <label style="margin-top:16px;">${t('settings_restore_label')}</label>
+      <textarea id="import-box" placeholder="${t('settings_import_placeholder')}"></textarea>
+      <button class="btn-secondary" id="import-btn">${t('settings_import_btn')}</button>
     </div>
     <div class="card" style="border-color: rgba(255,90,69,0.35);">
-      <div class="section-label" style="color:var(--coral);">🗑️ Réinitialiser</div>
-      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Supprime toutes tes séances, objectifs et douleurs loguées. Utile en cas de souci technique — pense à exporter avant si tu veux garder une trace.</div>
+      <div class="section-label" style="color:var(--coral);">${t('settings_reset_title')}</div>
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">${t('settings_reset_desc')}</div>
       ${resetConfirm ? `
-        <div style="font-size:13px; color:var(--coral); margin-bottom:10px; font-weight:600;">Es-tu sûr ? Cette action est irréversible.</div>
-        <button class="btn-primary" id="confirm-reset-btn" style="background:var(--coral);">Oui, tout effacer</button>
-        <button class="btn-secondary" id="cancel-reset-btn">Annuler</button>
+        <div style="font-size:13px; color:var(--coral); margin-bottom:10px; font-weight:600;">${t('settings_reset_confirm')}</div>
+        <button class="btn-primary" id="confirm-reset-btn" style="background:var(--coral);">${t('settings_reset_confirm_btn')}</button>
+        <button class="btn-secondary" id="cancel-reset-btn">${t('settings_reset_cancel_btn')}</button>
       ` : `
-        <button class="btn-secondary" id="ask-reset-btn" style="border-color:var(--coral); color:var(--coral); background:rgba(255,90,69,0.08);">Réinitialiser mes données</button>
+        <button class="btn-secondary" id="ask-reset-btn" style="border-color:var(--coral); color:var(--coral); background:rgba(255,90,69,0.08);">${t('settings_reset_ask_btn')}</button>
       `}
     </div>
   `;
@@ -2381,6 +2460,7 @@ function escapeHtml(s){
 }
 
 function render(){
+  applyStaticTranslations();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab===activeTab));
   const main = document.getElementById('main');
   if(activeTab==='new') main.innerHTML = renderNew();
@@ -2392,6 +2472,12 @@ function render(){
 }
 
 function attachHandlers(){
+  document.querySelectorAll('[data-act="set-lang"]').forEach(b => b.onclick = () => {
+    currentLang = b.dataset.val;
+    localStorage.setItem(LANG_KEY, currentLang);
+    applyStaticTranslations();
+    render();
+  });
   document.querySelectorAll('.tab').forEach(t => t.onclick = async () => {
     activeTab = t.dataset.tab;
     if(activeTab!=='new') lastCoach=null;
