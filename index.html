@@ -651,6 +651,56 @@ function todayStr(){ return new Date().toISOString().slice(0,10); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function disciplineInfo(name){ return DISCIPLINES.find(d=>d.name===name) || DISCIPLINES[DISCIPLINES.length-1]; }
 
+const DISCIPLINE_CATEGORY = {
+  'BJJ':'combat', 'MMA':'combat', 'Judo':'combat', 'Boxe':'combat', 'Muay Thaï':'combat', 'Lutte':'combat', 'Karaté':'combat',
+  'Musculation':'force', 'HYROX':'force', 'CrossFit':'force',
+  'Football':'cardio', 'Course':'cardio', 'Natation':'cardio', 'Basketball':'cardio', 'Tennis':'cardio', 'Cyclisme':'cardio',
+  'Rugby':'cardio', 'Volleyball':'cardio', 'Handball':'cardio', 'Ski':'cardio', 'Athlétisme':'cardio',
+  'Yoga/Pilates':'mobilite', 'Escalade':'mobilite'
+};
+function mainDisciplineCategory(list){
+  if(!list.length) return 'general';
+  const counts = {};
+  list.forEach(e => { counts[e.discipline] = (counts[e.discipline]||0) + 1; });
+  const top = Object.keys(counts).sort((a,b) => counts[b]-counts[a])[0];
+  return DISCIPLINE_CATEGORY[top] || 'general';
+}
+const TRAINING_FOCUS = {
+  perte: {
+    combat: "Ajoute 1 à 2 créneaux de cardio léger (corde à sauter, vélo, jogging) après tes séances techniques, sans sacrifier la technique elle-même.",
+    force: "Privilégie des circuits en enchaînement rapide avec peu de repos entre les exercices, plutôt que de la charge lourde isolée.",
+    cardio: "Garde ton volume actuel et ajoute 1 séance de fractionné par semaine pour accélérer la dépense énergétique.",
+    mobilite: "Complète avec 1 à 2 séances de cardio léger par semaine — la mobilité seule crée rarement le déficit nécessaire.",
+    general: "Ajoute 2 séances de cardio modéré par semaine (marche rapide, vélo, natation) en plus de ta pratique actuelle."
+  },
+  maintien: {
+    combat: "Garde l'équilibre actuel entre technique, sparring et renforcement — la régularité compte plus que le volume.",
+    force: "Continue ta progression en charge de façon graduelle, sans forcer les paliers.",
+    cardio: "Maintiens ton volume actuel, il est déjà cohérent avec un objectif de maintien.",
+    mobilite: "Ajoute ponctuellement une séance de renforcement léger pour équilibrer la pratique.",
+    general: "Garde ta régularité actuelle, c'est ce qui compte le plus pour un objectif de maintien."
+  },
+  prise: {
+    combat: "Ajoute 2 séances de renforcement musculaire par semaine (jambes, dos, épaules) en complément, sans réduire ta pratique technique.",
+    force: "Priorise la surcharge progressive sur les mouvements polyarticulaires (squat, tirage, développé), 3 à 4 séances par semaine avec repos suffisant entre les groupes musculaires.",
+    cardio: "Réduis légèrement le volume cardio si la prise de masse stagne, et ajoute 2 séances de renforcement musculaire par semaine.",
+    mobilite: "Ajoute 2 à 3 séances de renforcement musculaire par semaine — la mobilité seule ne suffit pas pour prendre de la masse.",
+    general: "Ajoute 2 à 3 séances de renforcement musculaire par semaine en complément de ta pratique actuelle."
+  },
+  performance: {
+    combat: "Priorise le travail technique, avec 1 à 2 séances de renforcement spécifique (grip, explosivité, gainage) et une vraie phase d'allègement avant compétition.",
+    force: "Priorise la force fonctionnelle transférable à ta pratique principale — mouvements composés, explosivité — plutôt que l'isolation.",
+    cardio: "Structure ta semaine par blocs (intensité / volume / récupération) plutôt que d'enchaîner les séances à fond sans variation.",
+    mobilite: "Complète avec du renforcement spécifique à ta pratique — la mobilité seule ne développe pas la performance.",
+    general: "Structure ta semaine avec des phases d'intensité variable plutôt que de pousser à fond à chaque séance."
+  }
+};
+function proteinFoodEquivalent(missingG){
+  const eggs = Math.max(1, Math.round(missingG / 6));
+  const chickenG = Math.round(missingG / 0.23);
+  return `l'équivalent d'environ ${eggs} œuf${eggs>1?'s':''}, ou ${chickenG}g de poulet/poisson, ou un shaker de whey`;
+}
+
 async function loadEntries(){
   try{
     const v = localStorage.getItem(STORAGE_KEY);
@@ -1157,6 +1207,31 @@ function generateSmartCoachAdvice(){
     items.push({ icon:'🔄', title:'Reprise', body: `Pas de séance loguée cette semaine. Une reprise en douceur aujourd'hui vaut mieux qu'attendre d'être à 100%.` });
   } else if(entries.length === 0 && checkins.length > 0){
     items.push({ icon:'🏃', title:'Reprise en douceur', body: `Tu suis déjà ta forme sans pratiquer de sport — c'est une bonne base. Pour reprendre, vise 2 séances courtes par semaine dans n'importe quelle activité qui te plaît, plutôt que de viser trop haut trop vite dès le départ.` });
+  }
+
+  // --- Plan d'action : étapes concrètes vers l'objectif choisi ---
+  if(nutrientNeeds){
+    const goalInfo = GOAL_OPTIONS.find(g => g.key === nutritionProfile.goal) || GOAL_OPTIONS[1];
+    const category = mainDisciplineCategory(recentSessions.length ? recentSessions : entries);
+    const trainingTip = (TRAINING_FOCUS[goalInfo.key] && TRAINING_FOCUS[goalInfo.key][category]) || TRAINING_FOCUS.maintien.general;
+
+    const withProtein = recentNutrition.filter(n => n.proteinG);
+    let nutritionStep;
+    if(withProtein.length){
+      const avgProtein = Math.round(withProtein.reduce((s,n)=>s+n.proteinG,0) / withProtein.length);
+      const missing = nutrientNeeds.protein - avgProtein;
+      nutritionStep = missing > 10
+        ? `Ajoute ${missing}g de protéines à ta journée type — ${proteinFoodEquivalent(missing)}.`
+        : `Tes apports en protéines sont déjà proches de ta cible, pas d'ajustement urgent ici.`;
+    } else {
+      nutritionStep = `Renseigne tes grammes de protéines dans le journal nutrition pour affiner cette étape.`;
+    }
+
+    items.push({
+      icon:'🎯',
+      title:`Plan d'action — ${goalInfo.label}`,
+      body: `<b>1. Nutrition :</b> ${nutritionStep}<br><b>2. Entraînement :</b> ${trainingTip}<br><span style="font-size:11px; color:var(--text-muted);">Pistes générales à adapter à ta situation — pas un avis médical ou nutritionnel personnalisé.</span>`
+    });
   }
 
   const basedOnLabel = latest
