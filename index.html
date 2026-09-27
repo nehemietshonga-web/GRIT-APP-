@@ -944,6 +944,15 @@ function generateCoachMessage(entry, allEntriesBeforeSave){
   const sameDiscipline = allEntriesBeforeSave.filter(e => e.discipline === entry.discipline).sort((a,b)=>b.date.localeCompare(a.date));
   const lastTwoLow = [entry, ...sameDiscipline].slice(0,3).filter(e => e.feeling <= 2).length;
 
+  // Compare au ressenti moyen récent pour détecter une vraie tendance, pas juste la valeur du jour
+  const recentSame = sameDiscipline.slice(0,4);
+  const recentAvg = recentSame.length ? recentSame.reduce((s,e)=>s+e.feeling,0)/recentSame.length : null;
+  const streak = (() => {
+    let count = 1;
+    for(const e of sameDiscipline){ if(e.feeling === entry.feeling) count++; else break; }
+    return count;
+  })();
+
   let icon = '🎯';
   let text = '';
 
@@ -959,6 +968,23 @@ function generateCoachMessage(entry, allEntriesBeforeSave){
   } else {
     text = "Grosse forme aujourd'hui ! C'est le bon moment pour une séance intense ou du sparring poussé demain.";
     icon = '🔥';
+  }
+
+  // Si le même ressenti revient plusieurs fois de suite, on le dit clairement et on ajuste le conseil en conséquence
+  if(streak >= 3){
+    if(entry.feeling >= 4){
+      text = `${streak} séances de suite avec une jauge haute en ${entry.discipline} — la forme est là de façon stable. C'est le moment d'augmenter progressivement la difficulté ou la charge plutôt que de rester sur le même niveau.`;
+      icon = '📈';
+    } else if(entry.feeling === 3){
+      text = `${streak} séances de suite à un ressenti moyen en ${entry.discipline} — ni en progression ni en fatigue. Un changement (nouvelle technique, partenaire différent, intensité modifiée) peut relancer la dynamique.`;
+      icon = '🔄';
+    }
+  } else if(recentAvg !== null){
+    if(entry.feeling > recentAvg + 0.5){
+      text += ` C'est mieux que ta moyenne récente en ${entry.discipline} (${recentAvg.toFixed(1)}/5) — bon signe de progression.`;
+    } else if(entry.feeling < recentAvg - 0.5){
+      text += ` C'est en dessous de ta moyenne récente en ${entry.discipline} (${recentAvg.toFixed(1)}/5) — pas d'inquiétude si c'est ponctuel, mais garde un œil dessus si ça se répète.`;
+    }
   }
 
   // Technique(s) en difficulté ce jour précis
@@ -1012,6 +1038,26 @@ function generateCoachMessage(entry, allEntriesBeforeSave){
     text += " Ta note mentionne une gêne ou de la fatigue — pense à la logguer précisément dans l'onglet Santé pour en suivre l'évolution, et n'hésite pas à consulter si ça persiste.";
     icon = '🩹';
   }
+
+  // Phrase d'ouverture qui situe clairement la personne dans sa progression avant le conseil du jour
+  const totalCount = sameDiscipline.length + 1;
+  let positionLine;
+  if(totalCount <= 2){
+    positionLine = `Séance n°${totalCount} loguée en ${entry.discipline} — encore tôt pour dégager une vraie tendance, continue à loguer pour affiner les conseils.`;
+  } else if(streak >= 3){
+    positionLine = entry.feeling >= 4
+      ? `Tu enchaînes ${streak} bonnes séances d'affilée en ${entry.discipline} — nette progression sur cette période.`
+      : entry.feeling === 3
+      ? `${streak} séances d'affilée sur un ressenti stable en ${entry.discipline} — un plateau, pas un recul.`
+      : `${streak} séances d'affilée avec une jauge basse en ${entry.discipline} — signal à prendre au sérieux, pas juste un coup de fatigue isolé.`;
+  } else if(recentAvg !== null && entry.feeling > recentAvg + 0.5){
+    positionLine = `En progression sur tes dernières séances de ${entry.discipline} — ta jauge du jour dépasse ta moyenne récente.`;
+  } else if(recentAvg !== null && entry.feeling < recentAvg - 0.5){
+    positionLine = `Petit passage plus bas que ta moyenne récente en ${entry.discipline} — normal dans une progression, à surveiller si ça continue.`;
+  } else {
+    positionLine = `Régularité maintenue en ${entry.discipline} — ta jauge du jour est cohérente avec tes séances récentes.`;
+  }
+  text = positionLine + " " + text;
 
   return { icon, text };
 }
