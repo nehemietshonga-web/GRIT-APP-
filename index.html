@@ -553,6 +553,7 @@ const DISCIPLINES = [
   {name:'Judo', emoji:'🥋', color:'#3f9d94'},
   {name:'Boxe', emoji:'🥊', color:'#5fb583'},
   {name:'Muay Thaï', emoji:'🦵', color:'#9b7fd4'},
+  {name:'Kickboxing K1', emoji:'🦵', color:'#c9622c'},
   {name:'Lutte', emoji:'🤼', color:'#6b8fa3'},
   {name:'Karaté', emoji:'🥋', color:'#e2532d'},
   {name:'Football', emoji:'⚽', color:'#d9a441'},
@@ -576,7 +577,8 @@ const DISCIPLINES = [
 const METHOD_HINTS = {
   'BJJ': 'ex : tarikoplata, avantages 2-0', 'MMA': 'ex : KO, soumission, décision',
   'Judo': 'ex : ippon, waza-ari', 'Boxe': 'ex : KO, arrêt arbitre, décision',
-  'Muay Thaï': 'ex : KO, décision, low kicks', 'Lutte': 'ex : tombé, décision aux points',
+  'Muay Thaï': 'ex : KO, décision, low kicks', 'Kickboxing K1': 'ex : KO, décision, low kicks',
+  'Lutte': 'ex : tombé, décision aux points',
   'Karaté': 'ex : ippon, points',
   'Football': 'ex : score, buts marqués', 'Course': 'ex : temps, distance, chrono',
   'Musculation': 'ex : record perso, charges soulevées', 'Natation': 'ex : temps, distance',
@@ -652,7 +654,7 @@ function uid(){ return Date.now().toString(36) + Math.random().toString(36).slic
 function disciplineInfo(name){ return DISCIPLINES.find(d=>d.name===name) || DISCIPLINES[DISCIPLINES.length-1]; }
 
 const DISCIPLINE_CATEGORY = {
-  'BJJ':'combat', 'MMA':'combat', 'Judo':'combat', 'Boxe':'combat', 'Muay Thaï':'combat', 'Lutte':'combat', 'Karaté':'combat',
+  'BJJ':'combat', 'MMA':'combat', 'Judo':'combat', 'Boxe':'combat', 'Muay Thaï':'combat', 'Kickboxing K1':'combat', 'Lutte':'combat', 'Karaté':'combat',
   'Musculation':'force', 'HYROX':'force', 'CrossFit':'force',
   'Football':'cardio', 'Course':'cardio', 'Natation':'cardio', 'Basketball':'cardio', 'Tennis':'cardio', 'Cyclisme':'cardio',
   'Rugby':'cardio', 'Volleyball':'cardio', 'Handball':'cardio', 'Ski':'cardio', 'Athlétisme':'cardio',
