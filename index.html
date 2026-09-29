@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="GRIT">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg: #fff6ee;
@@ -29,11 +29,11 @@
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{margin:0; padding:0;}
   body{
-    background: linear-gradient(165deg, #fff6ee 0%, #ffe8d6 35%, #ffd4c2 70%, #ffc4b8 100%);
+    background: linear-gradient(180deg, #fffaf5 0%, #fef2e8 45%, #fdece0 100%);
     background-attachment: fixed;
     color: var(--text);
     font-family: 'Poppins', sans-serif;
-    font-weight: 600;
+    font-weight: 400;
     min-height: 100vh;
     padding-bottom: 90px;
     position: relative;
@@ -88,9 +88,10 @@
   }
   header .brand-icon{ width: 40px; height: 40px; flex-shrink: 0; }
   header .brand-text h1{
-    font-family:'Baloo 2', sans-serif;
-    font-size: 30px;
-    letter-spacing: 0.06em;
+    font-family:'Outfit', sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    letter-spacing: -0.01em;
     margin: 0;
     line-height: 1;
     color: var(--text);
@@ -130,11 +131,11 @@
 
   .card{
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 18px;
+    border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    border-radius: 20px;
     padding: 18px;
     margin-bottom: 14px;
-    box-shadow: 0 4px 16px rgba(229,56,59,0.07);
+    box-shadow: 0 6px 20px rgba(34,38,58,0.06);
   }
 
   .coach-card{
@@ -169,56 +170,57 @@
 
   .discipline-grid{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .discipline-btn{
-    padding: 10px 4px; border-radius: 12px; border: 1.5px solid var(--border);
+    padding: 10px 4px; border-radius: 14px; border: none;
     background: var(--surface-2); color: var(--text-muted);
     font-family:'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.01em;
     cursor: pointer; text-align: center; display:flex; flex-direction:column; align-items:center; gap:3px;
-    transition: transform 0.12s ease;
+    transition: transform 0.12s ease, background 0.15s ease;
   }
   .discipline-btn:active{ transform: scale(0.94); }
   .discipline-btn .emoji{ font-size: 18px; }
-  .discipline-btn.active{ border-color: var(--dcolor, var(--coral)); color: var(--text); background: color-mix(in srgb, var(--dcolor, var(--coral)) 15%, var(--surface-2)); animation: popIn 0.25s ease; }
+  .discipline-btn.active{ color: var(--text); background: color-mix(in srgb, var(--dcolor, var(--coral)) 18%, var(--surface-2)); animation: popIn 0.25s ease; }
 
   .seg{ display:flex; gap: 8px; }
   .seg button{
-    flex:1; padding: 10px 8px; border-radius: 12px; border: 1.5px solid var(--border);
+    flex:1; padding: 10px 8px; border-radius: 14px; border: none;
     background: var(--surface-2); color: var(--text-muted);
     font-family:'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.03em; cursor: pointer;
-    transition: transform 0.12s ease;
+    transition: transform 0.12s ease, background 0.15s ease;
   }
   .seg button:active{ transform: scale(0.95); }
-  .seg button.active{ border-color: var(--coral); color: var(--coral); background: rgba(255,90,69,0.1); }
+  .seg button.active{ color: var(--coral); background: color-mix(in srgb, var(--coral) 14%, var(--surface-2)); }
 
   .fuel-row{ display:flex; gap:6px; margin-top: 10px; }
   .fuel-btn{
-    flex:1; padding: 12px 2px; border-radius: 12px; border: 1.5px solid var(--border);
+    flex:1; padding: 12px 2px; border-radius: 14px; border: none;
     background: var(--surface-2); cursor: pointer; display:flex; flex-direction:column; align-items:center; gap:4px;
     font-family:'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted);
-    transition: transform 0.12s ease;
+    transition: transform 0.12s ease, background 0.15s ease;
   }
   .fuel-btn:active{ transform: scale(0.92); }
   .fuel-btn .emoji{ font-size: 20px; transition: transform 0.2s ease; }
-  .fuel-btn.active{ border-width: 2px; animation: popIn 0.25s ease; }
+  .fuel-btn.active{ background: color-mix(in srgb, var(--gold) 16%, var(--surface-2)); animation: popIn 0.25s ease; }
   .fuel-btn.active .emoji{ transform: scale(1.15); }
   .fuel-bar{ height:6px; border-radius: 3px; background: var(--surface-2); margin-top:10px; overflow:hidden; display:flex; }
   .fuel-bar span{ flex:1; }
 
   .btn-primary{
-    width:100%; padding: 16px; border-radius: 18px; border: none;
-    background: linear-gradient(100deg, var(--coral), #ff8c42);
-    color: #fff; font-family:'Baloo 2', sans-serif; font-size: 15px; font-weight: 700;
-    letter-spacing: 0.02em; margin-top: 18px; cursor: pointer;
-    box-shadow: 0 8px 20px rgba(229,56,59,0.3);
+    width:100%; padding: 15px; border-radius: 14px; border: none;
+    background: var(--coral);
+    color: #fff; font-family:'Outfit', sans-serif; font-size: 15px; font-weight: 600;
+    letter-spacing: -0.005em; margin-top: 18px; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(229,56,59,0.22);
     transition: transform 0.12s ease;
   }
   .btn-primary:active{ transform: scale(0.97); }
 
   .filter-row{ display:flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; }
   .filter-chip{
-    flex-shrink: 0; padding: 7px 13px; border-radius: 20px; border: 1.5px solid var(--border);
-    background: var(--surface); color: var(--text-muted); font-family:'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer;
+    flex-shrink: 0; padding: 7px 14px; border-radius: 20px; border: none;
+    background: var(--surface-2); color: var(--text-muted); font-family:'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
   }
-  .filter-chip.active{ border-color: var(--teal); color: var(--teal); }
+  .filter-chip.active{ background: color-mix(in srgb, var(--teal) 16%, var(--surface-2)); color: var(--teal); }
 
   .entry{ border-bottom: 1px solid var(--border); padding: 14px 0; }
   .entry:last-child{ border-bottom:none; }
@@ -227,7 +229,7 @@
   .entry-tags{ display:flex; gap:6px; flex-wrap: wrap; justify-content:flex-end; }
   .tag{
     font-family:'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.02em;
-    padding: 4px 8px; border-radius: 8px; display:flex; align-items:center; gap:4px;
+    padding: 4px 9px; border-radius: 20px; display:flex; align-items:center; gap:4px;
   }
   .entry-stats{ display:flex; gap:14px; font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
   .entry-stats b{ color: var(--text); font-weight: 600; }
@@ -238,11 +240,11 @@
   .empty{ text-align:center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; }
 
   .stat-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-  .stat-box{ background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
-  .stat-box .num{ font-family:'Baloo 2', sans-serif; font-size: 30px; color: var(--gold); line-height: 1; }
+  .stat-box{ background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px; box-shadow: 0 4px 14px rgba(34,38,58,0.05); }
+  .stat-box .num{ font-family:'Outfit', sans-serif; font-weight: 700; font-size: 28px; color: var(--gold); line-height: 1; letter-spacing: -0.01em; }
   .stat-box .lbl{ font-family:'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); letter-spacing: 0.05em; margin-top: 6px; }
 
-  .chart-wrap svg{ width:100%; height: auto; display:block; }
+  .chart-wrap svg{ width:100%; height: auto; display:block; overflow: visible; }
   .chart-caption{ font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-muted); margin-top: 8px; display:flex; justify-content: space-between; }
   .ring-row{ display:flex; gap:16px; overflow-x:auto; padding:6px 2px 10px; -webkit-overflow-scrolling:touch; }
   .ring-item{ display:flex; flex-direction:column; align-items:center; gap:7px; flex-shrink:0; }
@@ -287,7 +289,7 @@
   .goal-item:last-child{ border-bottom: none; }
   .goal-title{ font-size: 14px; font-weight: 600; }
   .goal-date{ font-size: 12px; color: var(--text-muted); font-family:'IBM Plex Mono', monospace; }
-  .goal-countdown{ font-family:'Baloo 2', sans-serif; font-size: 22px; color: var(--gold); flex-shrink:0; text-align:right; }
+  .goal-countdown{ font-family:'Outfit', sans-serif; font-weight: 700; font-size: 22px; color: var(--gold); flex-shrink:0; text-align:right; }
   .goal-countdown small{ display:block; font-family:'IBM Plex Mono', monospace; font-size: 9px; color: var(--text-muted); letter-spacing:0.05em; }
   .add-goal-row{ display:flex; gap: 8px; margin-top: 12px; }
   .add-goal-row input[type=text]{ flex: 1.4; }
@@ -1708,9 +1710,9 @@ function renderRankCard(rank){
   <div class="card" style="background:linear-gradient(135deg, ${rank.tier.color}22, transparent); border-color:${rank.tier.color}55;">
     <div class="section-label">🏔️ Rang GRIT</div>
     <div style="display:flex; align-items:center; gap:14px;">
-      <div style="width:52px; height:52px; border-radius:50%; background:${rank.tier.color}; border:2px solid ${rank.tier.border||'var(--border)'}; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:'Baloo 2',sans-serif; font-size:20px; color:${rank.tier.text};">${rank.tierIndex+1}</div>
+      <div style="width:52px; height:52px; border-radius:50%; background:${rank.tier.color}; border:2px solid ${rank.tier.border||'var(--border)'}; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:'Outfit',sans-serif; font-weight:700; font-size:20px; color:${rank.tier.text};">${rank.tierIndex+1}</div>
       <div style="flex:1;">
-        <div style="font-family:'Baloo 2',sans-serif; font-size:22px; letter-spacing:0.03em;">Palier ${rank.tier.name}${rank.legend ? ' — Légende GRIT' : ` · Division ${rank.division+1}`}</div>
+        <div style="font-family:'Outfit',sans-serif; font-weight:700; font-size:20px; letter-spacing:-0.01em;">Palier ${rank.tier.name}${rank.legend ? ' — Légende GRIT' : ` · Division ${rank.division+1}`}</div>
         <div style="font-size:11px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace;">${rank.totalXP} XP cumulés</div>
       </div>
     </div>
@@ -1759,16 +1761,45 @@ function mostSessionsInWeek(list){
   return max;
 }
 
+function hasComeback(list){
+  const dates = [...new Set(list.map(e=>e.date))].sort();
+  for(let i=1;i<dates.length;i++){
+    const gap = Math.round((new Date(dates[i]+'T00:00:00') - new Date(dates[i-1]+'T00:00:00'))/86400000);
+    if(gap>=21){
+      const after = dates.filter(d=>{
+        const diff = Math.round((new Date(d+'T00:00:00') - new Date(dates[i]+'T00:00:00'))/86400000);
+        return diff>=0 && diff<=7;
+      });
+      if(after.length>=3) return true;
+    }
+  }
+  return false;
+}
+const RARITY_INFO = {
+  bronze: { label:'Bronze', color:'#b08d57' },
+  argent: { label:'Argent', color:'#9aa5b1' },
+  or: { label:'Or', color:'var(--gold)' },
+  legendaire: { label:'Légendaire', color:'var(--purple)' }
+};
 const BADGE_DEFS = [
-  { id:'first', emoji:'🥇', title:'Première séance', check: l => l.length>=1 },
-  { id:'ten', emoji:'🔟', title:'10 séances loguées', check: l => l.length>=10 },
-  { id:'fifty', emoji:'💯', title:'50 séances loguées', check: l => l.length>=50 },
-  { id:'firstwin', emoji:'🏆', title:'Première victoire', check: l => l.some(e=>e.result && e.result.outcome==='win') },
-  { id:'winstreak3', emoji:'⚡', title:'3 victoires d\'affilée', check: l => longestWinStreak(l)>=3 },
-  { id:'techvariety', emoji:'🧠', title:'10 techniques différentes', check: l => new Set(l.flatMap(e=>(e.techniques||[]).map(t=>t.name))).size>=10 },
-  { id:'streak7', emoji:'🔥', title:'7 jours d\'affilée', check: l => computeStreaks(l).best>=7 },
-  { id:'streak30', emoji:'🚀', title:'30 jours d\'affilée', check: l => computeStreaks(l).best>=30 },
-  { id:'multidisc', emoji:'🥋', title:'3 disciplines pratiquées', check: l => new Set(l.map(e=>e.discipline)).size>=3 }
+  { id:'first', emoji:'🥇', title:'Première séance', rarity:'bronze', check: l => l.length>=1, progress: l => ({cur:l.length, target:1}) },
+  { id:'five', emoji:'✋', title:'5 séances loguées', rarity:'bronze', check: l => l.length>=5, progress: l => ({cur:l.length, target:5}) },
+  { id:'ten', emoji:'🔟', title:'10 séances loguées', rarity:'bronze', check: l => l.length>=10, progress: l => ({cur:l.length, target:10}) },
+  { id:'streak3', emoji:'🔥', title:'3 jours d\'affilée', rarity:'bronze', check: l => computeStreaks(l).best>=3, progress: l => ({cur:computeStreaks(l).best, target:3}) },
+  { id:'multidisc', emoji:'🥋', title:'3 disciplines pratiquées', rarity:'bronze', check: l => new Set(l.map(e=>e.discipline)).size>=3, progress: l => ({cur:new Set(l.map(e=>e.discipline)).size, target:3}) },
+  { id:'fifty', emoji:'💯', title:'50 séances loguées', rarity:'argent', check: l => l.length>=50, progress: l => ({cur:l.length, target:50}) },
+  { id:'streak7', emoji:'🚀', title:'7 jours d\'affilée', rarity:'argent', check: l => computeStreaks(l).best>=7, progress: l => ({cur:computeStreaks(l).best, target:7}) },
+  { id:'firstwin', emoji:'🏆', title:'Première victoire', rarity:'argent', check: l => l.some(e=>e.result && e.result.outcome==='win'), progress: l => ({cur:l.some(e=>e.result && e.result.outcome==='win')?1:0, target:1}) },
+  { id:'techvariety', emoji:'🧠', title:'10 techniques différentes', rarity:'argent', check: l => new Set(l.flatMap(e=>(e.techniques||[]).map(t=>t.name))).size>=10, progress: l => ({cur:new Set(l.flatMap(e=>(e.techniques||[]).map(t=>t.name))).size, target:10}) },
+  { id:'bigweek', emoji:'📅', title:'5 séances en une semaine', rarity:'argent', check: l => mostSessionsInWeek(l)>=5, progress: l => ({cur:mostSessionsInWeek(l), target:5}) },
+  { id:'hundred', emoji:'🎯', title:'100 séances loguées', rarity:'or', check: l => l.length>=100, progress: l => ({cur:l.length, target:100}) },
+  { id:'streak30', emoji:'🌋', title:'30 jours d\'affilée', rarity:'or', check: l => computeStreaks(l).best>=30, progress: l => ({cur:computeStreaks(l).best, target:30}) },
+  { id:'winstreak3', emoji:'⚡', title:'3 victoires d\'affilée', rarity:'or', check: l => longestWinStreak(l)>=3, progress: l => ({cur:longestWinStreak(l), target:3}) },
+  { id:'multidisc5', emoji:'🌐', title:'5 disciplines pratiquées', rarity:'or', check: l => new Set(l.map(e=>e.discipline)).size>=5, progress: l => ({cur:new Set(l.map(e=>e.discipline)).size, target:5}) },
+  { id:'streak100', emoji:'👑', title:'100 jours d\'affilée', rarity:'legendaire', secret:true, check: l => computeStreaks(l).best>=100 },
+  { id:'tenwins', emoji:'🥇', title:'10 victoires au total', rarity:'legendaire', secret:true, check: l => l.filter(e=>e.result && e.result.outcome==='win').length>=10 },
+  { id:'comeback', emoji:'🔄', title:'Grand retour', rarity:'legendaire', secret:true, check: l => hasComeback(l) },
+  { id:'winstreak5', emoji:'🥊', title:'5 victoires d\'affilée', rarity:'legendaire', secret:true, check: l => longestWinStreak(l)>=5 }
 ];
 function getUnlockedBadgeIds(list){
   return new Set(BADGE_DEFS.filter(b => b.check(list)).map(b=>b.id));
@@ -2340,10 +2371,17 @@ function renderProgress(){
 
   const byDiscipline = {};
   sorted.forEach(e => { byDiscipline[e.discipline] = (byDiscipline[e.discipline]||0)+1; });
+  const maxDisciplineCount = Math.max(1, ...Object.values(byDiscipline));
   const disciplineBreakdown = Object.entries(byDiscipline).sort((a,b)=>b[1]-a[1]).map(([d,c]) => {
     const info = disciplineInfo(d);
-    return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px;">
-      <span>${info.emoji} ${d}</span><span class="mono" style="color:${info.color}; font-weight:600;">${c}</span>
+    const pct = Math.round((c/maxDisciplineCount)*100);
+    return `<div style="padding:9px 0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; margin-bottom:5px;">
+        <span>${info.emoji} ${d}</span><span class="mono" style="color:${info.color}; font-weight:600;">${c}</span>
+      </div>
+      <div style="height:7px; border-radius:4px; background:var(--surface-2); overflow:hidden;">
+        <div style="width:${pct}%; height:100%; border-radius:4px; background:${info.color}; transition:width 0.4s ease;"></div>
+      </div>
     </div>`;
   }).join('');
 
@@ -2473,19 +2511,56 @@ function renderProgress(){
         <div style="display:flex; justify-content:space-between; padding:8px 0;"><span>Plus longue série de victoires</span><b class="mono" style="color:var(--green)">${winStreak}</b></div>
       </div>`;
 
+    const totalUnlocked = BADGE_DEFS.filter(b => unlockedIds.has(b.id)).length;
+    let closestBadge = null, closestPct = -1;
+    BADGE_DEFS.forEach(b => {
+      if(unlockedIds.has(b.id) || b.secret || !b.progress) return;
+      const p = b.progress(sorted);
+      const pct = p.target > 0 ? p.cur / p.target : 0;
+      if(pct > closestPct){ closestPct = pct; closestBadge = { ...b, ...p }; }
+    });
+    const closestCard = closestBadge ? `
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <span style="font-size:13px; font-weight:600;">${closestBadge.emoji} ${closestBadge.title}</span>
+          <span style="font-size:12px; color:var(--text-muted);">${Math.min(closestBadge.cur,closestBadge.target)}/${closestBadge.target}</span>
+        </div>
+        <div style="height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden;">
+          <div style="width:${Math.min(100,Math.round(closestPct*100))}%; height:100%; background:var(--gold);"></div>
+        </div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">Encore ${Math.max(0,closestBadge.target-closestBadge.cur)} pour débloquer ce badge.</div>
+      </div>` : '';
+
     const badgesSection = `
       <div class="card">
-        <div class="section-label">🎖️ Badges</div>
-        <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:10px;">
-          ${BADGE_DEFS.map(b => {
-            const on = unlockedIds.has(b.id);
-            return `<div style="text-align:center; padding:10px 4px; border-radius:12px; border:1.5px solid ${on?'var(--gold)':'var(--border)'}; background:${on?'rgba(242,181,68,0.1)':'var(--surface-2)'}; opacity:${on?1:0.4};">
-              <div style="font-size:22px;">${b.emoji}</div>
-              <div style="font-size:9.5px; font-family:'IBM Plex Mono',monospace; margin-top:4px; color:${on?'var(--text)':'var(--text-muted)'};">${b.title}</div>
-            </div>`;
-          }).join('')}
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <div class="section-label" style="margin:0;">🎖️ Badges</div>
+          <span style="font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace;">${totalUnlocked}/${BADGE_DEFS.length}</span>
         </div>
-      </div>`;
+      </div>
+      ${closestCard}
+      ${['bronze','argent','or','legendaire'].map(rarity => {
+        const group = BADGE_DEFS.filter(b => b.rarity === rarity);
+        const unlockedInGroup = group.filter(b => unlockedIds.has(b.id)).length;
+        const info = RARITY_INFO[rarity];
+        return `
+        <div style="margin-top:14px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <span style="font-size:13px; font-weight:600; color:${info.color};">${info.label}</span>
+            <span style="font-size:11px; color:var(--text-muted);">${unlockedInGroup}/${group.length}</span>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(2,1fr); gap:10px;">
+            ${group.map(b => {
+              const on = unlockedIds.has(b.id);
+              const hidden = b.secret && !on;
+              return `<div style="text-align:center; padding:10px 4px; border-radius:12px; border:1.5px solid ${on?info.color:'var(--border)'}; background:${on?info.color+'1a':'var(--surface-2)'}; opacity:${on?1:0.5};">
+                <div style="font-size:22px;">${hidden ? '🔒' : b.emoji}</div>
+                <div style="font-size:10px; font-family:'IBM Plex Mono',monospace; margin-top:4px; color:${on?'var(--text)':'var(--text-muted)'};">${hidden ? 'Badge mystère' : b.title}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('')}`;
 
     sessionSection = `
       ${renderRankCard(rank)}
@@ -2553,23 +2628,52 @@ function groupByWeek(list, valueKey){
       count: vals.length
     }));
 }
+let __chartIdCounter = 0;
+function smoothPath(points){
+  if(points.length < 2) return '';
+  if(points.length === 2) return `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)} L ${points[1].x.toFixed(1)},${points[1].y.toFixed(1)}`;
+  let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+  for(let i=0;i<points.length-1;i++){
+    const p0 = points[i-1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i+1];
+    const p3 = points[i+2] || p2;
+    const cp1x = p1.x + (p2.x - p0.x)/6;
+    const cp1y = p1.y + (p2.y - p0.y)/6;
+    const cp2x = p2.x - (p3.x - p1.x)/6;
+    const cp2y = p2.y - (p3.y - p1.y)/6;
+    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
 function buildSimpleLineChart(points, opts){
   const { w=300, h=120, pad=14, color='#e0a422', refLineY=null, refLineColor='#e0a422' } = opts;
   const gridLines = [0.25,0.5,0.75].map(f => {
     const y = (pad + f*(h-2*pad)).toFixed(1);
-    return `<line x1="${pad}" y1="${y}" x2="${w-pad}" y2="${y}" stroke="var(--border)" stroke-width="1"/>`;
+    return `<line x1="${pad}" y1="${y}" x2="${w-pad}" y2="${y}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 4"/>`;
   }).join('');
   const refLine = refLineY!==null ? `<line x1="${pad}" y1="${refLineY.toFixed(1)}" x2="${w-pad}" y2="${refLineY.toFixed(1)}" stroke="${refLineColor}" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.6"/>` : '';
-  const linePts = points.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const gid = 'chartFill' + (++__chartIdCounter);
+  const curve = smoothPath(points);
+  const areaPath = points.length >= 2
+    ? `${curve} L ${points[points.length-1].x.toFixed(1)},${(h-pad).toFixed(1)} L ${points[0].x.toFixed(1)},${(h-pad).toFixed(1)} Z`
+    : '';
   const dots = points.map((p,i) => {
     const isLast = i===points.length-1;
     const dotColor = p.color || color;
     return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isLast?4.5:3}" fill="${dotColor}"${isLast?'':' stroke="var(--surface)" stroke-width="1.5"'}/>`;
   }).join('');
   return `<svg viewBox="0 0 ${w} ${h}">
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.28"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
     ${gridLines}
     ${refLine}
-    <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${areaPath ? `<path d="${areaPath}" fill="url(#${gid})" stroke="none"/>` : ''}
+    <path d="${curve}" fill="none" stroke="${color}" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>
     ${dots}
   </svg>`;
 }
