@@ -847,6 +847,61 @@ function recurringPainZones(list){
   return Object.entries(byZone).filter(([,c])=>c>=3).map(([z])=>z);
 }
 
+const PAIN_ZONES = [
+  { id:'genou', emoji:'🦵', label:'Genou',
+    careTips:["Évite les appuis en torsion (pivots, changements de direction brusques) tant que la douleur est présente.","Travaille la mobilité douce en flexion/extension sans forcer, plutôt que de bloquer l'articulation complètement."],
+    redFlags:"Genou qui se dérobe, blocage en flexion/extension, gonflement rapide et important, ou craquement entendu au moment du choc → consultation rapide (possible lésion ligamentaire ou méniscale)." },
+  { id:'cheville', emoji:'🦶', label:'Cheville',
+    careTips:["Limite l'appui complet tant que la douleur est vive — utilise tes mains ou un appui pour décharger.","Dès que supportable, travaille des petits cercles de cheville pour garder de la mobilité sans forcer."],
+    redFlags:"Impossible de poser le pied au sol, déformation visible, ou craquement net au moment du choc → urgences (possible fracture ou entorse grave)." },
+  { id:'epaule', emoji:'💪', label:'Épaule',
+    careTips:["Évite les mouvements au-dessus de la tête et les charges en extension tant que la douleur persiste.","Privilégie des rotations douces dans l'amplitude indolore plutôt que l'immobilisation totale."],
+    redFlags:"Sensation de luxation, bras impossible à lever, ou déformation visible de l'épaule → urgences (possible luxation)." },
+  { id:'dos', emoji:'🔙', label:'Dos / lombaires',
+    careTips:["Évite les positions statiques prolongées (debout ou assis) — bouge légèrement et souvent plutôt que de rester figé.","La position allongée jambes surélevées peut soulager la pression lombaire."],
+    redFlags:"Douleur qui descend dans la jambe, fourmillements ou engourdissement, perte de force dans le pied → consultation rapide (possible atteinte nerveuse)." },
+  { id:'cou', emoji:'🦴', label:'Cou / nuque',
+    careTips:["Évite les mouvements brusques de rotation ou les positions figées prolongées (téléphone, écran).","Des étirements très doux et lents peuvent aider, jamais en force."],
+    redFlags:"Douleur qui irradie dans le bras, fourmillements dans les mains, ou mal de tête violent après un choc → consultation urgente." },
+  { id:'coude', emoji:'💪', label:'Coude',
+    careTips:["Réduis les prises en force et les mouvements répétitifs de flexion/extension chargée.","Un strapping léger peut stabiliser sans bloquer complètement l'articulation."],
+    redFlags:"Impossibilité de plier ou tendre le bras normalement, ou déformation visible → urgences (possible fracture ou luxation)." },
+  { id:'poignet', emoji:'✋', label:'Poignet / main',
+    careTips:["Évite les appuis directs sur la main (pompes, bases en striking) tant que la douleur persiste.","Un strapping ou une genouillère de poignet peut sécuriser les appuis légers."],
+    redFlags:"Déformation visible, doigt qui ne se plie plus, ou douleur à la moindre pression osseuse → urgences (possible fracture)." },
+  { id:'hanche', emoji:'🦴', label:'Hanche / aine',
+    careTips:["Réduis l'amplitude des mouvements de jambe en grand écart ou en torsion.","Privilégie des mouvements courts et contrôlés plutôt que l'immobilisation stricte."],
+    redFlags:"Impossible de poser le pied au sol, ou douleur à l'aine intense et soudaine → consultation rapide (possible lésion musculaire profonde)." },
+  { id:'cuisse', emoji:'🦵', label:'Cuisse / ischio',
+    careTips:["Évite les sprints et étirements forcés dans les premiers jours.","La marche légère est généralement mieux tolérée que l'immobilité totale."],
+    redFlags:"Sensation de \"coup de fouet\" net (pop) suivi d'un hématome qui apparaît vite et important → consultation (possible déchirure musculaire)." },
+  { id:'mollet', emoji:'🦵', label:'Mollet / tendon d\'Achille',
+    careTips:["Évite les sauts et les montées sur la pointe des pieds tant que la douleur est vive.","Une talonnette temporaire peut réduire la tension sur le tendon."],
+    redFlags:"Sensation de coup soudain suivi de l'impossibilité de se mettre sur la pointe des pieds → consultation rapide (possible rupture du tendon d'Achille)." },
+  { id:'cotes', emoji:'🫁', label:'Côtes / torse',
+    careTips:["Évite les torsions du buste et les charges portées à deux bras tant que la douleur est présente.","Respire normalement même si c'est inconfortable — éviter de respirer pour limiter la douleur favorise d'autres soucis."],
+    redFlags:"Douleur qui empire nettement en respirant profondément, ou difficulté à respirer → urgences." },
+  { id:'pied', emoji:'🦶', label:'Pied',
+    careTips:["Limite l'appui complet et privilégie un chaussage stable et amorti le temps que ça calme.","Vérifie que la douleur n'est pas localisée sur un point précis et osseux, signe à surveiller."],
+    redFlags:"Impossible de poser le pied, ou gonflement très rapide et important → consultation rapide." },
+  { id:'autre', emoji:'🩹', label:'Autre',
+    careTips:["Note précisément la zone et le contexte d'apparition dans le champ note — ça aide à repérer un schéma si ça revient."],
+    redFlags:"Douleur qui s'intensifie, ne s'améliore pas après plusieurs jours de repos, ou s'accompagne de gonflement important → consultation." }
+];
+function painZoneInfo(label){
+  return PAIN_ZONES.find(z => z.label === label) || PAIN_ZONES[PAIN_ZONES.length-1];
+}
+function severityInfo(intensity){
+  if(intensity <= 2) return { label:'Légère', tone:'var(--green)', advice:"Gêne légère — tu peux probablement continuer en adaptant l'intensité, mais surveille son évolution sur les prochains jours." };
+  if(intensity === 3) return { label:'Modérée', tone:'var(--gold)', advice:"Assez présente pour ralentir sur cette zone. Vise 2 à 3 jours de repos actif ciblé avant de réévaluer." };
+  return { label:'Sévère', tone:'var(--coral)', advice:"Assez intense pour justifier une vraie pause sur cette zone. Si l'un des signes d'alerte ci-dessous est présent, consulte rapidement plutôt que d'attendre." };
+}
+function computeInjuryAdvice(zoneLabel, intensity){
+  const zone = painZoneInfo(zoneLabel);
+  const sev = severityInfo(intensity);
+  return { zone, sev };
+}
+
 async function loadGoals(){
   try{
     const v = localStorage.getItem(GOALS_KEY);
@@ -1498,26 +1553,47 @@ function renderAdvice(){
       </div>
       <div class="section-label" style="margin-top:14px;">Loguer une douleur / gêne</div>
       <label>Zone du corps</label>
-      <input type="text" id="pain-zone" placeholder="ex : genou droit, épaule, dos" value="${painForm.zone}">
+      <div class="discipline-grid">
+        ${PAIN_ZONES.map(z => `<button data-act="pain-zone" data-val="${z.label}" class="discipline-btn ${painForm.zone===z.label?'active':''}" style="--dcolor:var(--coral);"><span class="emoji">${z.emoji}</span>${z.label}</button>`).join('')}
+      </div>
       <label>Intensité</label>
       <div class="fuel-row">
-        ${[1,2,3,4,5].map(n => `<button data-act="pain-intensity" data-val="${n}" class="fuel-btn ${painForm.intensity==n?'active':''}" style="${painForm.intensity==n?'border-color:var(--coral); color:var(--coral)':''}">${n}</button>`).join('')}
+        ${[1,2,3,4,5].map(n => `<button data-act="pain-intensity" data-val="${n}" class="fuel-btn ${painForm.intensity==n?'active':''}" style="${painForm.intensity==n?'color:var(--coral)':''}">${n}</button>`).join('')}
       </div>
       <label>Note (optionnel)</label>
-      <input type="text" id="pain-note" placeholder="ex : gêne après le sparring" value="${painForm.note}">
+      <input type="text" id="pain-note" placeholder="ex : côté droit, gêne après le sparring" value="${painForm.note}">
       <button class="btn-secondary" id="add-pain-btn" style="border-color:var(--coral); color:var(--coral); background:rgba(255,90,69,0.08);">+ Ajouter la douleur</button>
       <div style="margin-top:16px;">${painRows}</div>
       <div style="font-size:11px; color:var(--text-muted); margin-top:12px; opacity:0.8;">Ceci n'est pas un avis médical. En cas de douleur persistante ou inquiétante, consulte un professionnel de santé.</div>
     </div>
 
-    <div class="card">
-      <div class="section-label">🧊 Premiers soins — principes généraux</div>
-      <div class="tip-item"><div class="icon">🛌</div><div class="body"><b>Repos</b> — arrête l'activité qui aggrave la douleur, le temps nécessaire dépend entièrement de la blessure et de la personne.</div></div>
-      <div class="tip-item"><div class="icon">🧊</div><div class="body"><b>Glace</b> — 15-20 min, plusieurs fois par jour les premières 48h, sur une blessure aiguë.</div></div>
-      <div class="tip-item"><div class="icon">🩹</div><div class="body"><b>Compression</b> — un bandage souple peut limiter le gonflement, sans serrer excessivement.</div></div>
-      <div class="tip-item"><div class="icon">⬆️</div><div class="body"><b>Élévation</b> — surélève la zone blessée quand c'est possible.</div></div>
-      <div style="font-size:11px; color:var(--text-muted); margin-top:10px; opacity:0.8;">⚠️ Aucune durée de reprise ne peut être donnée sans évaluation par un professionnel — chaque blessure est différente. Consulte un médecin ou kiné pour un vrai diagnostic et un plan de reprise.</div>
-    </div>
+    ${(() => {
+      const activeZoneLabel = painForm.zone || (healthLog.length ? [...healthLog].sort((a,b)=>b.date.localeCompare(a.date))[0].zone : '');
+      const activeIntensity = painForm.zone ? painForm.intensity : (healthLog.length ? [...healthLog].sort((a,b)=>b.date.localeCompare(a.date))[0].intensity : 3);
+      if(!activeZoneLabel){
+        return `<div class="card">
+          <div class="section-label">🧊 Premiers soins</div>
+          <div class="tip-item"><div class="icon">🛌</div><div class="body"><b>Repos</b> — arrête l'activité qui aggrave la douleur, le temps nécessaire dépend entièrement de la blessure et de la personne.</div></div>
+          <div class="tip-item"><div class="icon">🧊</div><div class="body"><b>Glace</b> — 15-20 min, plusieurs fois par jour les premières 48h, sur une blessure aiguë.</div></div>
+          <div class="tip-item"><div class="icon">🩹</div><div class="body"><b>Compression</b> — un bandage souple peut limiter le gonflement, sans serrer excessivement.</div></div>
+          <div class="tip-item"><div class="icon">⬆️</div><div class="body"><b>Élévation</b> — surélève la zone blessée quand c'est possible.</div></div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:10px; opacity:0.8;">Sélectionne une zone ci-dessus pour recevoir un conseil ciblé selon la zone et la gravité.</div>
+        </div>`;
+      }
+      const { zone, sev } = computeInjuryAdvice(activeZoneLabel, activeIntensity);
+      return `<div class="card" style="border-color:${sev.tone}55;">
+        <div class="section-label" style="margin:0;">🧊 Premiers soins — ${zone.emoji} ${zone.label}</div>
+        <div style="display:flex; align-items:center; gap:8px; margin:8px 0 12px;">
+          <span class="tag" style="background:${sev.tone}22; color:${sev.tone}; padding:5px 10px;">Gravité ${sev.label}</span>
+        </div>
+        <div style="font-size:13.5px; color:var(--text); margin-bottom:12px; line-height:1.45;">${sev.advice}</div>
+        <div class="tip-item"><div class="icon">🛌</div><div class="body"><b>Repos</b> — arrête l'activité qui aggrave la douleur sur cette zone précise.</div></div>
+        <div class="tip-item"><div class="icon">🧊</div><div class="body"><b>Glace</b> — 15-20 min, plusieurs fois par jour les premières 48h, sur une blessure aiguë.</div></div>
+        ${zone.careTips.map(tip => `<div class="tip-item"><div class="icon">🎯</div><div class="body">${tip}</div></div>`).join('')}
+        <div style="margin-top:12px; padding:10px 12px; background:${sev.tone}14; border-radius:12px; font-size:12.5px; color:var(--text); line-height:1.4;">⚠️ <b>Signes d'alerte pour cette zone :</b> ${zone.redFlags}</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:10px; opacity:0.8;">Ceci n'est pas un diagnostic. Ces conseils sont génériques et ne remplacent pas l'avis d'un professionnel de santé.</div>
+      </div>`;
+    })()}
 
     <div class="card">
       <div class="section-label">🍽️ Nutrition</div>
@@ -2792,6 +2868,7 @@ function attachHandlers(){
     catch(e){ box.select(); showToast('Sélectionne et copie manuellement'); }
   };
 
+  document.querySelectorAll('[data-act="pain-zone"]').forEach(b => b.onclick = () => { painForm.zone = b.dataset.val; render(); });
   document.querySelectorAll('[data-act="pain-intensity"]').forEach(b => b.onclick = () => { painForm.intensity = Number(b.dataset.val); render(); });
   document.querySelectorAll('[data-act="delete-pain"]').forEach(b => b.onclick = async () => {
     healthLog = healthLog.filter(p => p.id !== b.dataset.id);
@@ -2799,14 +2876,12 @@ function attachHandlers(){
     render();
     showToast('Entrée supprimée');
   });
-  const painZoneEl = document.getElementById('pain-zone');
   const painNoteEl = document.getElementById('pain-note');
-  if(painZoneEl) painZoneEl.oninput = e => painForm.zone = e.target.value;
   if(painNoteEl) painNoteEl.oninput = e => painForm.note = e.target.value;
   const addPainBtn = document.getElementById('add-pain-btn');
   if(addPainBtn) addPainBtn.onclick = async () => {
-    if(!painForm.zone.trim()){ showToast('Indique une zone'); return; }
-    healthLog.push({ id: uid(), date: todayStr(), zone: painForm.zone.trim(), intensity: painForm.intensity, note: painForm.note.trim() });
+    if(!painForm.zone){ showToast('Sélectionne une zone'); return; }
+    healthLog.push({ id: uid(), date: todayStr(), zone: painForm.zone, intensity: painForm.intensity, note: painForm.note.trim() });
     await saveHealth();
     painForm = { zone:'', intensity:3, note:'' };
     showToast('Douleur enregistrée 🩺');
