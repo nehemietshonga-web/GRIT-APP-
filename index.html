@@ -383,6 +383,8 @@ const NUTRITION_KEY = 'grit-nutrition';
 const NUTRITION_PROFILE_KEY = 'grit-nutrition-profile';
 const CHECKIN_KEY = 'grit-checkins';
 const LANG_KEY = 'grit-lang';
+const PROGRAM_KEY = 'grit-weekly-program';
+const PROGRAM_COMPLETION_KEY = 'grit-program-completion';
 let currentLang = localStorage.getItem(LANG_KEY) || 'fr';
 
 const I18N = {
@@ -644,6 +646,7 @@ let newMode = 'session';
 let painForm = { zone: '', intensity: 3, note: '' };
 let programDiscipline = 'BJJ';
 let generatedProgram = null;
+let programCompletion = {};
 let resetConfirm = false;
 let activeTab = 'new';
 let historyFilter = 'Toutes';
@@ -710,7 +713,7 @@ async function loadEntries(){
     const v = localStorage.getItem(STORAGE_KEY);
     entries = v ? JSON.parse(v) : [];
   }catch(e){ entries = []; }
-  if(entries.length){
+  if(entries.length && !generatedProgram){
     const mostRecent = [...entries].sort((a,b)=> b.date.localeCompare(a.date))[0];
     programDiscipline = mostRecent.discipline;
   }
@@ -911,6 +914,29 @@ async function loadGoals(){
 async function saveGoals(){
   try{ localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); }
   catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+
+async function loadProgramState(){
+  try{
+    const v = localStorage.getItem(PROGRAM_KEY);
+    if(v){
+      const parsed = JSON.parse(v);
+      generatedProgram = parsed.generatedProgram || null;
+      programDiscipline = parsed.programDiscipline || programDiscipline;
+    }
+  }catch(e){ generatedProgram = null; }
+  try{
+    const c = localStorage.getItem(PROGRAM_COMPLETION_KEY);
+    programCompletion = c ? JSON.parse(c) : {};
+  }catch(e){ programCompletion = {}; }
+}
+async function saveProgramState(){
+  try{ localStorage.setItem(PROGRAM_KEY, JSON.stringify({ generatedProgram, programDiscipline })); }
+  catch(e){ console.error('storage error', e); }
+}
+async function saveProgramCompletion(){
+  try{ localStorage.setItem(PROGRAM_COMPLETION_KEY, JSON.stringify(programCompletion)); }
+  catch(e){ console.error('storage error', e); }
 }
 function daysUntil(dateStr){
   const target = new Date(dateStr + 'T00:00:00');
@@ -1440,7 +1466,16 @@ function renderAdvice(){
 
   const ascSorted = [...entries].sort((a,b)=> a.date.localeCompare(b.date));
   const tierLabels = { light:'🟦 Semaine allégée', moderate:'🟨 Semaine équilibrée', high:'🟥 Semaine intense' };
+
+  const todayProgramDay = generatedProgram ? generatedProgram.days.find(d => d.dateStr === todayStr()) : null;
+  const todayReminderBanner = (todayProgramDay && !todayProgramDay.isRest && !programCompletion[todayProgramDay.dateStr]) ? `
+    <div class="reminder-banner">
+      <span style="font-size:20px;">⏰</span>
+      <span>Au programme aujourd'hui : <b>${escapeHtml(todayProgramDay.type)}</b>. Pense à cocher la séance une fois faite — ou à loguer ta séance dans l'onglet "Nouvelle".</span>
+    </div>` : '';
+
   const programSection = `
+    ${todayReminderBanner}
     <div class="card">
       <div class="section-label">📅 Programme de la semaine</div>
       <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">Structure générée à partir de ta jauge récente et de tes techniques — pas une vraie IA, une logique calculée sur tes données.</div>
@@ -1451,24 +1486,46 @@ function renderAdvice(){
         </button>`).join('')}
       </div>
       <button class="btn-secondary" id="generate-program-btn">🔄 Générer le programme</button>
-      ${generatedProgram ? `
+      ${generatedProgram ? (() => {
+        const trainingDays = generatedProgram.days.filter(d => !d.isRest);
+        const doneCount = trainingDays.filter(d => programCompletion[d.dateStr]).length;
+        return `
         <div style="margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--gold); text-transform:uppercase; letter-spacing:0.04em;">${tierLabels[generatedProgram.tier]}</div>
         <div style="font-size:12px; color:var(--text-muted); margin-top:6px;">${escapeHtml(generatedProgram.reasoning)}</div>
         <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">${generatedProgram.trainingDaysCount} jour(s) d'entraînement · ${generatedProgram.restDaysCount} jour(s) de repos</div>
+        ${trainingDays.length ? `
+        <div style="margin-top:10px;">
+          <div style="display:flex; justify-content:space-between; font-size:11.5px; color:var(--text-muted); margin-bottom:5px;">
+            <span>Séances réalisées</span><span>${doneCount}/${trainingDays.length}</span>
+          </div>
+          <div style="height:7px; border-radius:4px; background:var(--surface-2); overflow:hidden;">
+            <div style="width:${Math.round((doneCount/trainingDays.length)*100)}%; height:100%; border-radius:4px; background:var(--gold); transition:width 0.4s ease;"></div>
+          </div>
+        </div>` : ''}
         <div style="margin-top:8px;">
           ${generatedProgram.days.map(d => `
-            <div style="display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--border);">
-              <div style="font-size:18px;">${d.icon}</div>
-              <div style="flex:1;">
+            <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border);">
+              ${!d.isRest ? `
+                <label style="flex-shrink:0; padding-top:2px; cursor:pointer;">
+                  <input type="checkbox" data-act="toggle-program-day" data-date="${d.dateStr}" ${programCompletion[d.dateStr] ? 'checked' : ''} style="width:19px; height:19px; accent-color:var(--gold); cursor:pointer;">
+                </label>
+              ` : `<div style="font-size:18px; width:19px; text-align:center; flex-shrink:0;">${d.icon}</div>`}
+              <div style="flex:1; ${!d.isRest && programCompletion[d.dateStr] ? 'opacity:0.55;' : ''}">
                 <div style="font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace;">${d.day}</div>
-                <div style="font-size:13.5px; font-weight:600;">${d.type}</div>
+                <div style="font-size:13.5px; font-weight:600; ${!d.isRest && programCompletion[d.dateStr] ? 'text-decoration:line-through;' : ''}">${d.icon} ${d.type}</div>
                 ${d.duration ? `<div style="font-size:11.5px; color:var(--gold); margin-top:1px;">${d.duration}</div>` : ''}
                 ${d.detail ? `<div style="font-size:12px; color:var(--text-muted); margin-top:1px;">${escapeHtml(d.detail)}</div>` : ''}
+                ${d.exercises && d.exercises.length ? `
+                  <div style="margin-top:6px; padding:8px 10px; background:var(--surface-2); border-radius:10px;">
+                    ${d.exercises.map(ex => `<div style="font-size:12px; line-height:1.5;">• ${escapeHtml(ex)}</div>`).join('')}
+                  </div>
+                ` : ''}
               </div>
             </div>
           `).join('')}
         </div>
-      ` : ''}
+      `;
+      })() : ''}
     </div>
   `;
 
@@ -2199,6 +2256,91 @@ const REST_TIPS = [
 ];
 const WEEKDAY_FULL = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
 
+// ---- Blocs d'exercices concrets : séries / répétitions / temps, par catégorie de discipline et type de séance ----
+function buildExerciseBlock(category, type, techniques){
+  const t1 = techniques[0] || null;
+  const t2 = techniques[1] || null;
+  const cat = category || 'general';
+
+  if(type === 'Repos complet' || type === 'Repos') return [];
+
+  if(type === 'Repos actif'){
+    return ['20 min marche rapide ou vélo souple', '10 min étirements doux sur les zones sollicitées récemment'];
+  }
+
+  if(type === 'Renforcement'){
+    if(cat === 'force'){
+      return ['4 x 8-10 reps : squat', '4 x 8-10 reps : développé couché ou militaire', '3 x 8 reps : tirage ou traction', '3 x 12 reps : fentes marchées', '3 x 30 sec gainage (planche)'];
+    }
+    return ['3 x 12 reps : squat au poids du corps', '3 x 10 reps : pompes (genoux si besoin)', '3 x 12 reps : fentes alternées', '3 x 30 sec gainage (planche)', '3 x 15 reps : mollets ou gainage latéral'];
+  }
+
+  if(type.includes('Cardio')){
+    const level = type.includes('intensif') ? 'intensif' : type.includes('modéré') ? 'modéré' : 'léger';
+    if(level === 'léger') return ['25-30 min footing, vélo ou natation, allure conversationnelle (tu peux parler sans être essoufflé)'];
+    if(level === 'modéré') return ['10 min échauffement', '5 x 3 min effort modéré / 2 min récupération active', '5 min retour au calme'];
+    return ['10 min échauffement', '8 x 30 sec sprint ou effort maximal / 90 sec récupération', '5 min retour au calme'];
+  }
+
+  if(type.includes('Sparring')){
+    const level = type.includes('léger') ? 'léger' : type.includes('prépa') ? 'compét' : 'normal';
+    if(cat !== 'combat'){
+      return ['10 min échauffement dynamique', '20-30 min match ou opposition en conditions réelles', '10 min retour au calme + étirements'];
+    }
+    if(level === 'léger') return ['10 min échauffement', '4 x 3 min sparring à 60-70% d\'intensité, 1 min repos entre rounds', '5 min retour au calme'];
+    if(level === 'compét') return ['15 min échauffement complet', '5 x 5 min sparring en conditions proches de la compétition, 1 min repos entre rounds', '10 min retour au calme + étirements'];
+    return ['12 min échauffement', '5 x 3 min sparring intensité normale, 1 min repos entre rounds', '5 min retour au calme'];
+  }
+
+  // Technique légère / Technique / Technique ciblée / Technique intensive
+  const intensive = type.includes('intensive');
+  const targeted = type.includes('ciblée');
+  const light = type.includes('légère');
+  const warmup = light ? '10 min échauffement léger' : intensive ? '15 min échauffement complet' : '10-12 min échauffement';
+
+  if(cat === 'combat'){
+    const drillTime = light ? '3 x 4 min' : intensive ? '5 x 5 min' : '4 x 5 min';
+    const lines = [warmup];
+    if(targeted && t1){
+      lines.push(`${drillTime} drilling ciblé : ${t1}`);
+      lines.push('3 x 2 min répétitions isolées sur ce mouvement précis, à charge réduite');
+    } else {
+      lines.push(`${drillTime} drilling : ${t1 || 'technique au choix'}${t2 ? ', ' + t2 : ''}`);
+    }
+    if(intensive) lines.push('3 x 3 min situationnel (départ imposé, objectif précis)');
+    lines.push('5 min retour au calme + étirements');
+    return lines;
+  }
+
+  if(cat === 'force'){
+    const sets = light ? '3 x 8-10 reps' : intensive ? '5 x 6-8 reps' : '4 x 8 reps';
+    const lines = [warmup + ' + mobilité articulaire'];
+    if(targeted && t1) lines.push(`${sets} : ${t1} — focus technique d'exécution`);
+    else lines.push(`${sets} : ${t1 || 'mouvement principal'}${t2 ? ', puis ' + t2 : ''}`);
+    if(intensive) lines.push('3 x effort maximal sur le mouvement travaillé (AMRAP ou charge proche du max)');
+    lines.push('5 min retour au calme');
+    return lines;
+  }
+
+  if(cat === 'mobilite'){
+    const dur = light ? '20 min' : intensive ? '40 min' : '30 min';
+    const lines = [warmup];
+    lines.push(`${dur} travail technique : ${t1 || 'séquence au choix'}${t2 ? ', ' + t2 : ''}`);
+    if(targeted && t1) lines.push(`10 min focus isolé sur : ${t1}`);
+    lines.push('10 min étirements / respiration');
+    return lines;
+  }
+
+  // cardio category ou général : sport co / raquette / course, etc.
+  const blockDur = light ? '20 min' : intensive ? '35 min' : '25-30 min';
+  const lines = [warmup];
+  if(targeted && t1) lines.push(`${blockDur} travail technique ciblé : ${t1}`);
+  else lines.push(`${blockDur} travail technique : ${t1 || 'au choix'}${t2 ? ', ' + t2 : ''}`);
+  if(intensive) lines.push('4 x 2 min situation de match à intensité élevée, 1 min récupération');
+  lines.push('5-10 min retour au calme');
+  return lines;
+}
+
 function generateWeeklyProgram(discipline, sorted){
   const disciplineEntries = sorted.filter(e => e.discipline === discipline && daysSince(e.date) <= 14);
   const pool = disciplineEntries.length >= 2 ? disciplineEntries : sorted.filter(e => daysSince(e.date) <= 14);
@@ -2251,24 +2393,27 @@ function generateWeeklyProgram(discipline, sorted){
   const reasoning = `Basé sur : ${reasons.join(' · ')}.`;
 
   const template = PROGRAM_TEMPLATES[tier];
-  const todayIdx = new Date().getDay();
+  const category = DISCIPLINE_CATEGORY[discipline] || 'general';
 
   const days = template.map((type,i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
+    const dateStr = d.toISOString().slice(0,10);
     const dayLabel = i === 0 ? `Aujourd'hui · ${WEEKDAY_FULL[d.getDay()]}` : `${WEEKDAY_FULL[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}`;
     let detail = '';
+    const picks = (type.includes('Technique') || type.includes('Sparring')) ? pickTechniques(2) : [];
     if(type === 'Technique ciblée' && weakTech){
       detail = `Focus : ${weakTech}`;
-    } else if(type.includes('Technique') || type.includes('Sparring')){
-      const picks = pickTechniques(2);
-      if(picks.length) detail = picks.join(', ');
+      if(picks.length) picks[0] = weakTech;
+    } else if(picks.length){
+      detail = picks.join(', ');
     }
     const isRest = type.includes('Repos') && type !== 'Repos actif';
     if(isRest && !detail){
       detail = REST_TIPS[i % REST_TIPS.length];
     }
-    return { day: dayLabel, type, icon: DAY_ICONS[type] || '📋', detail, duration: SESSION_DURATION[type] || null, isRest };
+    const exercises = buildExerciseBlock(category, type, picks);
+    return { dateStr, day: dayLabel, type, icon: DAY_ICONS[type] || '📋', detail, exercises, duration: SESSION_DURATION[type] || null, isRest };
   });
 
   const trainingDaysCount = days.filter(d => !d.isRest).length;
@@ -2934,15 +3079,28 @@ function attachHandlers(){
   document.querySelectorAll('[data-act="program-discipline"]').forEach(b => b.onclick = () => {
     programDiscipline = b.dataset.val;
     generatedProgram = null;
+    saveProgramState();
     render();
   });
   const generateProgramBtn = document.getElementById('generate-program-btn');
   if(generateProgramBtn) generateProgramBtn.onclick = () => {
     const sorted = [...entries].sort((a,b)=> a.date.localeCompare(b.date));
     generatedProgram = generateWeeklyProgram(programDiscipline, sorted);
+    saveProgramState();
     showToast('Programme généré 📅');
     render();
   };
+  document.querySelectorAll('[data-act="toggle-program-day"]').forEach(cb => cb.onchange = () => {
+    const date = cb.dataset.date;
+    if(cb.checked){
+      programCompletion[date] = true;
+      showToast('Séance validée 💪');
+    } else {
+      delete programCompletion[date];
+    }
+    saveProgramCompletion();
+    render();
+  });
 
   const exportBtn = document.getElementById('export-btn');
   if(exportBtn) exportBtn.onclick = () => {
@@ -3091,7 +3249,7 @@ function initConsentGate(){
   };
 }
 function startApp(){
-  loadEntries();
+  loadProgramState().then(loadEntries);
   loadGoals().then(render);
   loadHealth().then(render);
   loadNutrition().then(render);
