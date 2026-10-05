@@ -153,38 +153,6 @@
   }
   .coach-card .msg{ font-size: 14px; line-height: 1.45; color: var(--text); }
 
-  /* ---- Aide contextuelle (boutons ?) ---- */
-  .help-btn{
-    display:inline-flex; align-items:center; justify-content:center;
-    width:20px; height:20px; margin-left:8px; padding:0; vertical-align:middle;
-    border-radius:50%; border:1px solid var(--border); background:var(--surface-2);
-    color:var(--text-muted); font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600;
-    line-height:1; cursor:pointer; text-transform:none; letter-spacing:0;
-    transition: transform 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-  }
-  .help-btn:hover, .help-btn:focus-visible{ color:var(--coral); border-color:var(--coral); outline:none; }
-  .help-btn:active{ transform: scale(0.92); }
-  .help-overlay{
-    position:fixed; inset:0; z-index:200; background:rgba(34,38,58,0.45);
-    display:flex; align-items:flex-end; justify-content:center; padding:0 12px 12px;
-    animation: helpFade 0.2s ease both;
-  }
-  .help-sheet{
-    width:100%; max-width:480px; max-height:80vh; overflow-y:auto;
-    background:var(--surface); border-radius:22px; padding:20px 20px 18px;
-    box-shadow:0 12px 40px rgba(34,38,58,0.25); animation: helpUp 0.25s ease both;
-  }
-  .help-sheet h3{ margin:0 0 10px; font-size:16px; font-weight:600; color:var(--text); }
-  .help-sheet p{ margin:0 0 10px; font-size:13.5px; line-height:1.5; color:var(--text); }
-  .help-sheet ul{ margin:0 0 10px; padding-left:18px; font-size:13.5px; line-height:1.5; }
-  .help-sheet li{ margin-bottom:4px; }
-  .help-sheet .help-close{
-    width:100%; margin-top:6px; padding:11px; border-radius:12px; border:1px solid var(--border);
-    background:var(--surface-2); color:var(--text); font-family:inherit; font-size:14px; font-weight:500; cursor:pointer;
-  }
-  @keyframes helpFade{ from{opacity:0} to{opacity:1} }
-  @keyframes helpUp{ from{transform:translateY(24px); opacity:0} to{transform:none; opacity:1} }
-
   .section-label{
     font-family:'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
     text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;
@@ -417,6 +385,8 @@ const CHECKIN_KEY = 'grit-checkins';
 const LANG_KEY = 'grit-lang';
 const PROGRAM_KEY = 'grit-weekly-program';
 const PROGRAM_COMPLETION_KEY = 'grit-program-completion';
+const CHALLENGE_KEY = 'grit-daily-challenge';
+const CHALLENGE_LOG_KEY = 'grit-challenge-log';
 let currentLang = localStorage.getItem(LANG_KEY) || 'fr';
 
 const I18N = {
@@ -679,6 +649,8 @@ let painForm = { zone: '', intensity: 3, note: '' };
 let programDiscipline = 'BJJ';
 let generatedProgram = null;
 let programCompletion = {};
+let dailyChallenge = null;
+let challengeLog = [];
 let resetConfirm = false;
 let activeTab = 'new';
 let historyFilter = 'Toutes';
@@ -970,6 +942,25 @@ async function saveProgramCompletion(){
   try{ localStorage.setItem(PROGRAM_COMPLETION_KEY, JSON.stringify(programCompletion)); }
   catch(e){ console.error('storage error', e); }
 }
+
+async function loadChallengeState(){
+  try{
+    const v = localStorage.getItem(CHALLENGE_KEY);
+    dailyChallenge = v ? JSON.parse(v) : null;
+  }catch(e){ dailyChallenge = null; }
+  try{
+    const v = localStorage.getItem(CHALLENGE_LOG_KEY);
+    challengeLog = v ? JSON.parse(v) : [];
+  }catch(e){ challengeLog = []; }
+}
+async function saveChallengeState(){
+  try{ localStorage.setItem(CHALLENGE_KEY, JSON.stringify(dailyChallenge)); }
+  catch(e){ console.error('storage error', e); }
+}
+async function saveChallengeLog(){
+  try{ localStorage.setItem(CHALLENGE_LOG_KEY, JSON.stringify(challengeLog)); }
+  catch(e){ console.error('storage error', e); }
+}
 function daysUntil(dateStr){
   const target = new Date(dateStr + 'T00:00:00');
   const now = new Date(todayStr() + 'T00:00:00');
@@ -1002,6 +993,66 @@ function dayOfYear(){
   return Math.floor((now - start) / 86400000);
 }
 function getQuoteOfDay(){ return QUOTES[dayOfYear() % QUOTES.length]; }
+
+// ---- Défi GRIT du jour : exercice le plus pratiqué, cible concrète, change chaque jour ----
+const CHALLENGE_XP = 25;
+const REP_EXERCISE_KEYWORDS = ['traction','pompe','squat','fente','burpee','crunch','abdo','développé','soulevé','tirage','dip','jab','direct','crochet','uppercut','coup de poing','coup de pied','tir','passe','dribble'];
+const TIME_EXERCISE_KEYWORDS = ['gainage','planche','course','vélo','corde','étirement','mobilité','nage','crawl','brasse','fractionné','footing','marche','randori','sparring','kumite'];
+const CHALLENGE_REP_TARGETS = [15,20,25,30,40];
+const CHALLENGE_TIME_TARGETS = [3,5,8,10,12];
+const CHALLENGE_DRILL_TARGETS = [15,20,25,30];
+
+function pickChallengeExercise(list){
+  const freq = {};
+  list.forEach(e => (e.techniques||[]).forEach(t => { if(t.name) freq[t.name] = (freq[t.name]||0)+1; }));
+  const sortedTech = Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+  if(sortedTech.length) return sortedTech[0][0];
+  const discCount = {};
+  list.forEach(e => { discCount[e.discipline] = (discCount[e.discipline]||0)+1; });
+  const topDisc = Object.entries(discCount).sort((a,b)=>b[1]-a[1])[0];
+  if(topDisc){
+    const lib = EXERCISE_LIBRARY[topDisc[0]] || [];
+    if(lib.length) return lib[dayOfYear() % lib.length];
+  }
+  return 'Pompes';
+}
+function classifyExercise(name, category){
+  const n = name.toLowerCase();
+  if(REP_EXERCISE_KEYWORDS.some(k => n.includes(k))) return 'reps';
+  if(TIME_EXERCISE_KEYWORDS.some(k => n.includes(k))) return 'time';
+  if(category === 'combat') return 'drilling';
+  if(category === 'force') return 'reps';
+  if(category === 'cardio' || category === 'mobilite') return 'time';
+  return 'reps';
+}
+function generateDailyChallenge(list){
+  const exerciseName = pickChallengeExercise(list);
+  const category = mainDisciplineCategory(list);
+  const mode = classifyExercise(exerciseName, category);
+  const seed = dayOfYear();
+  let target, label, unit;
+  if(mode === 'reps'){
+    target = CHALLENGE_REP_TARGETS[seed % CHALLENGE_REP_TARGETS.length];
+    label = `${target} ${exerciseName.toLowerCase()} à cumuler aujourd'hui`;
+    unit = 'reps';
+  } else if(mode === 'time'){
+    target = CHALLENGE_TIME_TARGETS[seed % CHALLENGE_TIME_TARGETS.length];
+    label = `${target} min de ${exerciseName.toLowerCase()} à cumuler aujourd'hui`;
+    unit = 'min';
+  } else {
+    target = CHALLENGE_DRILL_TARGETS[seed % CHALLENGE_DRILL_TARGETS.length];
+    label = `${target} répétitions techniques de ${exerciseName}, à vide ou à charge réduite`;
+    unit = 'reps';
+  }
+  return { date: todayStr(), exerciseName, mode, target, unit, label, done:false };
+}
+function ensureDailyChallenge(){
+  if(!dailyChallenge || dailyChallenge.date !== todayStr()){
+    dailyChallenge = generateDailyChallenge(entries);
+    saveChallengeState();
+  }
+  return dailyChallenge;
+}
 
 // ---- "Il y a un an / un mois" ----
 function getThrowback(list){
@@ -1808,7 +1859,7 @@ function entryXP(e){
   return xp;
 }
 function getRankInfo(list){
-  const totalXP = list.reduce((s,e)=>s+entryXP(e),0);
+  const totalXP = list.reduce((s,e)=>s+entryXP(e),0) + (challengeLog.length * CHALLENGE_XP);
   let tierIndex = Math.floor(totalXP / TIER_XP);
   let legend = false;
   if(tierIndex > TIERS.length-1){ legend = true; tierIndex = TIERS.length-1; }
@@ -1952,15 +2003,18 @@ const BADGE_DEFS = [
   { id:'ten', emoji:'🔟', title:'10 séances loguées', rarity:'bronze', check: l => l.length>=10, progress: l => ({cur:l.length, target:10}) },
   { id:'streak3', emoji:'🔥', title:'3 jours d\'affilée', rarity:'bronze', check: l => computeStreaks(l).best>=3, progress: l => ({cur:computeStreaks(l).best, target:3}) },
   { id:'multidisc', emoji:'🥋', title:'3 disciplines pratiquées', rarity:'bronze', check: l => new Set(l.map(e=>e.discipline)).size>=3, progress: l => ({cur:new Set(l.map(e=>e.discipline)).size, target:3}) },
+  { id:'challenge1', emoji:'⚡', title:'Premier Défi GRIT relevé', rarity:'bronze', check: () => challengeLog.length>=1, progress: () => ({cur:challengeLog.length, target:1}) },
   { id:'fifty', emoji:'💯', title:'50 séances loguées', rarity:'argent', check: l => l.length>=50, progress: l => ({cur:l.length, target:50}) },
   { id:'streak7', emoji:'🚀', title:'7 jours d\'affilée', rarity:'argent', check: l => computeStreaks(l).best>=7, progress: l => ({cur:computeStreaks(l).best, target:7}) },
   { id:'firstwin', emoji:'🏆', title:'Première victoire', rarity:'argent', check: l => l.some(e=>e.result && e.result.outcome==='win'), progress: l => ({cur:l.some(e=>e.result && e.result.outcome==='win')?1:0, target:1}) },
   { id:'techvariety', emoji:'🧠', title:'10 techniques différentes', rarity:'argent', check: l => new Set(l.flatMap(e=>(e.techniques||[]).map(t=>t.name))).size>=10, progress: l => ({cur:new Set(l.flatMap(e=>(e.techniques||[]).map(t=>t.name))).size, target:10}) },
   { id:'bigweek', emoji:'📅', title:'5 séances en une semaine', rarity:'argent', check: l => mostSessionsInWeek(l)>=5, progress: l => ({cur:mostSessionsInWeek(l), target:5}) },
+  { id:'challenge7', emoji:'⚡', title:'7 Défis GRIT relevés', rarity:'argent', check: () => challengeLog.length>=7, progress: () => ({cur:challengeLog.length, target:7}) },
   { id:'hundred', emoji:'🎯', title:'100 séances loguées', rarity:'or', check: l => l.length>=100, progress: l => ({cur:l.length, target:100}) },
   { id:'streak30', emoji:'🌋', title:'30 jours d\'affilée', rarity:'or', check: l => computeStreaks(l).best>=30, progress: l => ({cur:computeStreaks(l).best, target:30}) },
   { id:'winstreak3', emoji:'⚡', title:'3 victoires d\'affilée', rarity:'or', check: l => longestWinStreak(l)>=3, progress: l => ({cur:longestWinStreak(l), target:3}) },
   { id:'multidisc5', emoji:'🌐', title:'5 disciplines pratiquées', rarity:'or', check: l => new Set(l.map(e=>e.discipline)).size>=5, progress: l => ({cur:new Set(l.map(e=>e.discipline)).size, target:5}) },
+  { id:'challenge30', emoji:'⚡', title:'30 Défis GRIT relevés', rarity:'or', check: () => challengeLog.length>=30, progress: () => ({cur:challengeLog.length, target:30}) },
   { id:'streak100', emoji:'👑', title:'100 jours d\'affilée', rarity:'legendaire', secret:true, check: l => computeStreaks(l).best>=100 },
   { id:'tenwins', emoji:'🥇', title:'10 victoires au total', rarity:'legendaire', secret:true, check: l => l.filter(e=>e.result && e.result.outcome==='win').length>=10 },
   { id:'comeback', emoji:'🔄', title:'Grand retour', rarity:'legendaire', secret:true, check: l => hasComeback(l) },
@@ -2023,6 +2077,22 @@ function renderThrowbackCard(){
   </div>`;
 }
 
+function renderDailyChallengeCard(){
+  const ch = ensureDailyChallenge();
+  const doneToday = !!ch.done;
+  return `<div class="card" id="daily-challenge-card" style="background: linear-gradient(135deg, rgba(255,90,69,0.08), transparent); border-color: rgba(255,90,69,0.3);">
+    <div class="section-label" style="color:var(--coral);">⚡ Défi GRIT du jour</div>
+    <div style="font-size:15.5px; font-weight:700; margin-bottom:4px;">${escapeHtml(ch.label)}</div>
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Choisi d'après ce que tu pratiques le plus — un nouveau défi chaque jour.</div>
+    ${doneToday ? `
+      <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; background:rgba(47,179,128,0.12); border-radius:12px; color:var(--green); font-size:13.5px; font-weight:600;">✅ Défi relevé aujourd'hui — +${CHALLENGE_XP} XP</div>
+    ` : `
+      <button class="btn-secondary" id="validate-challenge-btn" style="border-color:var(--coral); color:var(--coral); background:rgba(255,90,69,0.08); width:100%;">✅ J'ai relevé le défi (+${CHALLENGE_XP} XP)</button>
+    `}
+    ${challengeLog.length ? `<div style="font-size:11px; color:var(--text-muted); margin-top:10px; font-family:'IBM Plex Mono',monospace;">${challengeLog.length} défi(s) relevé(s) au total</div>` : ''}
+  </div>`;
+}
+
 function renderWeeklyChallengeCard(){
   const wc = getWeeklyChallengeProgress(entries);
   const pct = Math.min(100, (wc.count/wc.target)*100);
@@ -2082,6 +2152,7 @@ function renderNew(){
 
   return `
   ${modeToggle}
+  ${renderDailyChallengeCard()}
   ${renderQuoteCard()}
   ${renderWeeklyChallengeCard()}
   ${renderThrowbackCard()}
@@ -2939,170 +3010,6 @@ function escapeHtml(s){
   return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// ---- Aide contextuelle : bouton "?" sur chaque section ----
-const HELP = {
-  rank: {
-    fr: { title: '🏔️ Rang GRIT', body: `<p>Ton rang reflète ta régularité et tes efforts, pas ton niveau technique. Chaque séance loguée rapporte de l'XP :</p>
-      <ul><li><b>10 XP</b> par séance</li><li><b>+15</b> si c'est une compétition</li><li><b>+5</b> si tu notes les techniques travaillées</li><li><b>+5</b> si tu ajoutes une note</li><li><b>+20</b> en cas de victoire</li></ul>
-      <p>100 XP = 1 division. 4 divisions = 1 palier (400 XP). Les paliers vont de Bronze à Diamant, puis tu atteins le rang maximal.</p>` },
-    en: { title: '🏔️ GRIT Rank', body: `<p>Your rank reflects consistency and effort, not technical level. Every logged session earns XP:</p>
-      <ul><li><b>10 XP</b> per session</li><li><b>+15</b> for a competition</li><li><b>+5</b> if you add the techniques you worked on</li><li><b>+5</b> if you add a note</li><li><b>+20</b> for a win</li></ul>
-      <p>100 XP = 1 division. 4 divisions = 1 tier (400 XP). Tiers go from Bronze to Diamond, then you reach the top rank.</p>` }
-  },
-  coach: {
-    fr: { title: '🧠 Coach GRIT', body: `<p>Après chaque enregistrement, Coach GRIT te donne un message basé sur tes données : ton ressenti (la jauge), tes séries de séances, ta régularité, tes douleurs et ton suivi santé.</p>
-      <p>Ce n'est pas une IA externe : c'est une logique intégrée à l'appli, qui s'affine à mesure que tu loggues. Plus tu enregistres, plus ses conseils sont pertinents.</p>` },
-    en: { title: '🧠 Coach GRIT', body: `<p>After each entry, Coach GRIT gives you a message based on your data: how you felt (the gauge), session streaks, consistency, pain and health check-ins.</p>
-      <p>It's not an external AI: it's logic built into the app that gets sharper as you log more.</p>` }
-  },
-  challenge: {
-    fr: { title: '🎯 Défi de la semaine', body: `<p>L'objectif : loguer <b>3 séances</b> sur la semaine en cours. La barre se remplit à chaque séance enregistrée, et repart à zéro chaque semaine.</p>` },
-    en: { title: '🎯 Weekly challenge', body: `<p>The goal: log <b>3 sessions</b> during the current week. The bar fills with each session you record and resets every week.</p>` }
-  },
-  mode: {
-    fr: { title: 'Que veux-tu enregistrer ?', body: `<ul><li><b>🥋 Séance sportive</b> : une séance d'entraînement ou une compétition. Elle fait gagner de l'XP et alimente rang, badges et records.</li><li><b>🩺 Suivi santé</b> : un jour sans sport ? Note juste ton sommeil, ton poids et ton ressenti général.</li></ul>` },
-    en: { title: 'What do you want to log?', body: `<ul><li><b>🥋 Training session</b>: a workout or a competition. It earns XP and feeds your rank, badges and records.</li><li><b>🩺 Health check-in</b>: no training today? Just log your sleep, weight and overall feeling.</li></ul>` }
-  },
-  checkin: {
-    fr: { title: '🩺 Suivi santé du jour', body: `<p>Poids, sommeil et ressenti sont optionnels : remplis ce que tu veux. Ces données servent à tracer tes courbes dans l'onglet Progression et à nourrir Coach GRIT (fatigue, manque de sommeil, variations de poids).</p>` },
-    en: { title: '🩺 Daily health check-in', body: `<p>Weight, sleep and feeling are all optional: fill in what you want. This data feeds your charts in the Progress tab and Coach GRIT (fatigue, lack of sleep, weight changes).</p>` }
-  },
-  discipline: {
-    fr: { title: 'Discipline', body: `<p>Choisis le sport de ta séance. Ensuite tu précises le type (entraînement, compétition…), ton ressenti et, si tu veux, les techniques travaillées. Plus tu es précis, plus l'analyse et les conseils sont justes.</p>` },
-    en: { title: 'Discipline', body: `<p>Pick the sport for your session. Then set the type (training, competition…), how you felt and, if you want, the techniques you worked on. The more precise you are, the better the analysis and advice.</p>` }
-  },
-  program: {
-    fr: { title: '📅 Programme de la semaine', body: `<p>Une structure de semaine générée à partir de ta jauge récente et de tes techniques travaillées. Ce n'est pas une vraie IA : c'est une logique calculée sur tes données.</p><p>Coche chaque séance une fois faite pour suivre ton avancement.</p>` },
-    en: { title: '📅 Weekly program', body: `<p>A week structure generated from your recent feeling gauge and the techniques you've worked on. It's not a real AI: it's logic computed from your data.</p><p>Tick each session once it's done to track your progress.</p>` }
-  },
-  health: {
-    fr: { title: '🏥 Santé', body: `<p>Ici tu suis ton sommeil moyen et tes douleurs ou gênes. Quand tu loggues une douleur (zone du corps + intensité), l'appli te propose des conseils de premiers soins et te prévient si une douleur revient souvent ou si ton poids bouge beaucoup.</p><p>Ça ne remplace pas un avis médical.</p>` },
-    en: { title: '🏥 Health', body: `<p>Track your average sleep and any pain or discomfort here. When you log a pain (body area + intensity), the app suggests first-aid tips and warns you if a pain keeps coming back or your weight changes a lot.</p><p>It doesn't replace medical advice.</p>` }
-  },
-  firstaid: {
-    fr: { title: '🧊 Premiers soins', body: `<p>Conseils généraux adaptés à la zone et à la gravité de la douleur que tu viens de loguer. Si la douleur est forte ou persiste, consulte un professionnel de santé.</p>` },
-    en: { title: '🧊 First aid', body: `<p>General tips matched to the area and severity of the pain you just logged. If it's severe or lingers, see a healthcare professional.</p>` }
-  },
-  nutrition: {
-    fr: { title: '🍽️ Nutrition', body: `<p>Loggue tes repas et ton hydratation. L'appli calcule ta moyenne de protéines sur 7 jours et la compare à ta cible (calculée par le calculateur plus bas).</p>` },
-    en: { title: '🍽️ Nutrition', body: `<p>Log your meals and hydration. The app computes your 7-day average protein and compares it to your target (from the calculator below).</p>` }
-  },
-  foods: {
-    fr: { title: '🥗 Aliments à privilégier', body: `<p>Suggestions générales basées sur ton dernier repas loggé et ton historique. Ce n'est pas un plan nutritionnel personnalisé : pour un vrai suivi, un(e) nutritionniste reste la meilleure ressource.</p>` },
-    en: { title: '🥗 Foods to favor', body: `<p>General suggestions based on your last logged meal and your history. It isn't a personalized nutrition plan: for real guidance, a nutritionist is your best resource.</p>` }
-  },
-  calc: {
-    fr: { title: '🧮 Calculateur de besoins', body: `<p>Renseigne ta taille, ton poids, ton âge, ton sexe, ton niveau d'activité et ton objectif : l'appli estime tes besoins quotidiens en calories et en nutriments (dont ta cible de protéines).</p><p>Si tu as loggué des séances, elle te suggère aussi le niveau d'activité qui correspond à ta semaine. Ce sont des estimations, pas un avis médical.</p>` },
-    en: { title: '🧮 Needs calculator', body: `<p>Enter your height, weight, age, sex, activity level and goal: the app estimates your daily calorie and nutrient needs (including your protein target).</p><p>If you've logged sessions, it also suggests the activity level matching your week. These are estimates, not medical advice.</p>` }
-  },
-  goals: {
-    fr: { title: '🎯 Objectifs & échéances', body: `<p>Ajoute un objectif avec une date (une compétition, un passage de grade, un objectif de poids…). L'appli affiche le compte à rebours et s'en sert pour adapter les conseils quand l'échéance approche.</p>` },
-    en: { title: '🎯 Goals & deadlines', body: `<p>Add a goal with a date (a competition, a belt test, a weight target…). The app shows the countdown and uses it to adapt advice as the deadline gets close.</p>` }
-  },
-  summary: {
-    fr: { title: '📤 Résumé pour ton coach', body: `<p>Génère un texte récapitulatif de tes 7 derniers jours (séances, ressenti, santé) que tu peux copier-coller à ton coach ou à tes partenaires d'entraînement.</p>` },
-    en: { title: '📤 Coach summary', body: `<p>Generates a recap of your last 7 days (sessions, feeling, health) that you can copy and paste to your coach or training partners.</p>` }
-  },
-  recovery: {
-    fr: { title: 'Conseils récupération', body: `<p>Des bases de récupération (sommeil, hydratation, mobilité…) valables pour tout le monde. Pour des conseils adaptés à toi, regarde Coach GRIT et l'analyse dans Progression.</p>` },
-    en: { title: 'Recovery tips', body: `<p>Recovery basics (sleep, hydration, mobility…) that apply to everyone. For advice tailored to you, check Coach GRIT and the analysis in Progress.</p>` }
-  },
-  techniques: {
-    fr: { title: '🎯 Techniques les plus travaillées', body: `<p>Le classement des techniques que tu as notées dans tes séances, avec le nombre de fois travaillées (×) et l'émoji de ton ressenti moyen quand tu les bossais.</p>` },
-    en: { title: '🎯 Most practiced techniques', body: `<p>A ranking of the techniques you noted in your sessions, with how many times you worked them (×) and the emoji of your average feeling when doing so.</p>` }
-  },
-  weight: {
-    fr: { title: '⚖️ Évolution du poids', body: `<p>Courbe de ton poids à partir de tes suivis santé. Il faut au moins deux pesées pour qu'elle s'affiche.</p>` },
-    en: { title: '⚖️ Weight trend', body: `<p>A curve of your weight from your health check-ins. You need at least two weigh-ins for it to appear.</p>` }
-  },
-  feeling: {
-    fr: { title: '⚙️ Évolution du ressenti', body: `<p>Comment tu te sens au fil du temps (la jauge de 1 à 5 saisie à chaque séance ou suivi). Une tendance qui baisse sur plusieurs entrées est un signal à surveiller.</p>` },
-    en: { title: '⚙️ Feeling trend', body: `<p>How you feel over time (the 1-5 gauge you enter with each session or check-in). A downward trend over several entries is a signal to watch.</p>` }
-  },
-  sleep: {
-    fr: { title: '😴 Sommeil', body: `<p>Ta moyenne et ta régularité de sommeil, calculées à partir de tes suivis santé. Plus tu loggues de nuits, plus les tendances sont fiables.</p>` },
-    en: { title: '😴 Sleep', body: `<p>Your average and regularity of sleep, computed from your health check-ins. The more nights you log, the more reliable the trends.</p>` }
-  },
-  records: {
-    fr: { title: '🏅 Records personnels', body: `<p>Tes meilleures marques : le plus de séances sur 7 jours, et ta plus longue série de victoires en compétition.</p><p>La « série en cours » compte les jours consécutifs avec au moins une séance.</p>` },
-    en: { title: '🏅 Personal records', body: `<p>Your best marks: most sessions in 7 days and your longest competition win streak.</p><p>The "current streak" counts consecutive days with at least one session.</p>` }
-  },
-  badges: {
-    fr: { title: '🎖️ Badges', body: `<p>Des succès à débloquer en t'entraînant : séries de jours d'affilée, victoires d'affilée, nombre de séances…</p><p>Ils sont classés par rareté (bronze, argent, or, légendaire). Certains sont secrets et ne se révèlent qu'une fois débloqués. Tu peux voir ceux dont tu es le plus proche.</p>` },
-    en: { title: '🎖️ Badges', body: `<p>Achievements to unlock as you train: day streaks, win streaks, session counts…</p><p>They're ranked by rarity (bronze, silver, gold, legendary). Some are secret and only reveal themselves once unlocked. You can see the ones you're closest to.</p>` }
-  },
-  breakdown: {
-    fr: { title: 'Répartition par discipline', body: `<p>Comment tes séances se répartissent entre tes différents sports.</p>` },
-    en: { title: 'Discipline breakdown', body: `<p>How your sessions are split across your different sports.</p>` }
-  },
-  analysis: {
-    fr: { title: '🔬 Analyse poussée', body: `<p>Des observations calculées sur l'ensemble de tes données (séances, ressenti, sommeil, techniques). Elle apparaît quand tu as assez d'entrées pour qu'elle soit fiable.</p>` },
-    en: { title: '🔬 Deep analysis', body: `<p>Observations computed across all your data (sessions, feeling, sleep, techniques). It appears once you have enough entries for it to be reliable.</p>` }
-  },
-  reminders: {
-    fr: { title: '🔔 Rappel quotidien', body: `<p>Active une notification quotidienne pour ne pas oublier de loguer. Sur iPhone, ajoute d'abord GRIT à l'écran d'accueil (icône partager → « Sur l'écran d'accueil »).</p>` },
-    en: { title: '🔔 Daily reminder', body: `<p>Turn on a daily notification so you don't forget to log. On iPhone, first add GRIT to your home screen (share icon → "Add to Home Screen").</p>` }
-  },
-  backup: {
-    fr: { title: '💾 Sauvegarde', body: `<p><b>Exporter</b> te donne un texte contenant toutes tes données : garde-le de côté. <b>Restaurer</b> te permet de coller ce texte pour récupérer tes données, par exemple sur un autre appareil.</p>` },
-    en: { title: '💾 Backup', body: `<p><b>Export</b> gives you a text containing all your data: keep it somewhere safe. <b>Restore</b> lets you paste that text to recover your data, for example on another device.</p>` }
-  },
-  reset: {
-    fr: { title: '🗑️ Réinitialiser', body: `<p>Supprime définitivement tes séances, objectifs et douleurs loguées. Exporte tes données avant si tu veux en garder une trace.</p>` },
-    en: { title: '🗑️ Reset', body: `<p>Permanently deletes your sessions, goals and logged pain. Export your data first if you want to keep a copy.</p>` }
-  }
-};
-// [regex sur le texte du titre de section, clé d'aide] — premier match gagnant
-const HELP_RULES = [
-  [/Rang GRIT/, 'rank'], [/^Coach GRIT$/, 'coach'], [/Défi de la semaine|Weekly challenge/, 'challenge'],
-  [/Que veux-tu enregistrer/, 'mode'], [/Suivi santé du jour/, 'checkin'], [/^Discipline$/, 'discipline'],
-  [/Programme de la semaine/, 'program'], [/Premiers soins/, 'firstaid'], [/^🏥/, 'health'],
-  [/Aliments à privilégier/, 'foods'], [/Calculateur de besoins/, 'calc'], [/^🍽️/, 'nutrition'],
-  [/Objectifs & échéances/, 'goals'], [/Résumé pour ton coach/, 'summary'], [/Conseils récupération/, 'recovery'],
-  [/Techniques les plus travaillées/, 'techniques'], [/Évolution du poids/, 'weight'], [/Évolution du ressenti/, 'feeling'],
-  [/^😴/, 'sleep'], [/Records personnels/, 'records'], [/^🎖️/, 'badges'], [/Répartition par discipline/, 'breakdown'],
-  [/Analyse poussée/, 'analysis'], [/^🔔/, 'reminders'], [/^💾/, 'backup'], [/^🗑️/, 'reset']
-];
-function closeHelp(){
-  const o = document.getElementById('help-overlay');
-  if(o) o.remove();
-  document.removeEventListener('keydown', helpEscHandler);
-}
-function helpEscHandler(e){ if(e.key === 'Escape') closeHelp(); }
-function openHelp(key){
-  const h = HELP[key];
-  if(!h) return;
-  const c = h[currentLang] || h.fr;
-  closeHelp();
-  const o = document.createElement('div');
-  o.className = 'help-overlay';
-  o.id = 'help-overlay';
-  o.innerHTML = `<div class="help-sheet" role="dialog" aria-modal="true" aria-label="${escapeHtml(c.title)}">
-    <h3>${c.title}</h3>${c.body}
-    <button class="help-close" type="button">${currentLang === 'en' ? 'Got it' : 'Compris'}</button>
-  </div>`;
-  o.addEventListener('click', e => { if(e.target === o) closeHelp(); });
-  o.querySelector('.help-close').onclick = closeHelp;
-  document.body.appendChild(o);
-  document.addEventListener('keydown', helpEscHandler);
-  trackEvent('help_open', { key });
-}
-function injectHelpButtons(){
-  document.querySelectorAll('#main .section-label, #main .coach-card .label').forEach(el => {
-    if(el.querySelector('.help-btn')) return;
-    const txt = el.textContent.trim();
-    const rule = HELP_RULES.find(r => r[0].test(txt));
-    if(!rule) return;
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'help-btn';
-    b.textContent = '?';
-    b.setAttribute('aria-label', currentLang === 'en' ? 'Help' : 'Aide');
-    b.onclick = e => { e.stopPropagation(); openHelp(rule[1]); };
-    el.appendChild(b);
-  });
-}
-
 function render(){
   applyStaticTranslations();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab===activeTab));
@@ -3113,7 +3020,6 @@ function render(){
   else if(activeTab==='advice') main.innerHTML = renderAdvice();
   else main.innerHTML = renderSettings();
   attachHandlers();
-  injectHelpButtons();
 }
 
 function attachHandlers(){
@@ -3299,6 +3205,20 @@ function attachHandlers(){
     render();
   });
 
+  const validateChallengeBtn = document.getElementById('validate-challenge-btn');
+  if(validateChallengeBtn) validateChallengeBtn.onclick = () => {
+    if(!dailyChallenge || dailyChallenge.done) return;
+    dailyChallenge.done = true;
+    saveChallengeState();
+    if(!challengeLog.includes(dailyChallenge.date)){
+      challengeLog.push(dailyChallenge.date);
+      saveChallengeLog();
+    }
+    celebrate(validateChallengeBtn);
+    showToast(`Défi relevé ! +${CHALLENGE_XP} XP 🔥`);
+    render();
+  };
+
   const exportBtn = document.getElementById('export-btn');
   if(exportBtn) exportBtn.onclick = () => {
     const box = document.getElementById('export-box');
@@ -3446,6 +3366,7 @@ function initConsentGate(){
   };
 }
 function startApp(){
+  loadChallengeState();
   loadProgramState().then(loadEntries);
   loadGoals().then(render);
   loadHealth().then(render);
