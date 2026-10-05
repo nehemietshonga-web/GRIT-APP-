@@ -308,6 +308,31 @@
     opacity: 0; transition: opacity 0.25s ease; pointer-events: none; z-index: 30; white-space: nowrap;
   }
   .toast.show{ opacity: 1; }
+
+  .section-label{ display:flex; align-items:center; gap:6px; }
+  .help-btn{
+    display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+    width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;
+    background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+    color: var(--text-muted); font-family:'Outfit', sans-serif; font-weight:700; font-size:11px;
+    line-height:1; padding:0; transition: background 0.15s ease, color 0.15s ease;
+  }
+  .help-btn:active{ transform: scale(0.9); }
+  .help-overlay{
+    position: fixed; inset: 0; background: rgba(20,18,15,0.55); backdrop-filter: blur(2px);
+    display:flex; align-items:center; justify-content:center; z-index: 200; padding: 24px;
+  }
+  .help-modal{
+    background: var(--surface); border-radius: 20px; padding: 22px; max-width: 360px; width:100%;
+    max-height: 78vh; overflow-y:auto; box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+  }
+  .help-modal h3{
+    margin: 0 0 10px; font-family:'Outfit', sans-serif; font-weight:700; font-size: 17px; color: var(--text);
+    display:flex; align-items:center; gap:8px;
+  }
+  .help-modal p{ margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; color: var(--text); }
+  .help-modal .close-help-btn{ margin-top: 0; }
 </style>
 </head>
 <body>
@@ -751,6 +776,42 @@ function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
   setTimeout(()=> t.classList.remove('show'), 1600);
+}
+
+const HELP_CONTENT = {
+  program: { title:'📅 Programme de la semaine', body:"Génère un plan d'entraînement sur 7 jours adapté à ta discipline principale et ton niveau d'activité récent, avec des exercices précis (séries, répétitions, durées). Coche chaque jour une fois la séance faite — un rappel s'affiche automatiquement le jour où une séance est prévue et pas encore validée." },
+  health: { title:'🏥 Santé & premiers soins', body:"Logue une douleur ou une gêne en indiquant la zone du corps et son intensité. L'app te propose ensuite des conseils de premiers soins adaptés à cette zone précise et à la gravité indiquée (repos, glace, signes d'alerte). Ce n'est pas un avis médical — en cas de doute, consulte un professionnel de santé." },
+  nutrition: { title:'🍽️ Nutrition', body:"Logue tes repas, ton hydratation et tes apports en protéines. Le calculateur en bas de section estime tes besoins caloriques et en protéines à partir de ta taille, ton poids, ton âge, ton sexe et ton objectif (perte, maintien, prise de masse)." },
+  goals: { title:'🎯 Objectifs & échéances', body:"Fixe un objectif avec une date cible, puis découpe-le en étapes (jalons) que tu coches au fur et à mesure. La barre de progression se met à jour automatiquement selon les jalons validés." },
+  coachSummary: { title:'📤 Résumé pour ton coach', body:"Génère un résumé texte de ta semaine (séances, ressenti, sommeil, nutrition) que tu peux copier-coller pour l'envoyer à ton coach ou partenaire d'entraînement." },
+  rank: { title:'🏔️ Rang GRIT', body:"Ton rang progresse grâce à l'XP gagnée en loguant des séances, en relevant le Défi GRIT du jour et en validant ton programme de la semaine. Chaque palier (Bronze, Argent, Or...) est divisé en divisions — enchaîne les séances régulièrement pour monter plus vite." },
+  dailyChallenge: { title:'⚡ Défi GRIT du jour', body:"Un défi différent chaque jour, basé sur l'exercice ou la technique que tu pratiques le plus. Valide-le une fois fait pour gagner de l'XP et avancer sur les badges liés aux défis (1, 7, 30 défis relevés)." },
+  weeklyChallenge: { title:'🎯 Défi de la semaine', body:"Un objectif à atteindre sur 7 jours (nombre de séances, régularité...). Il se réinitialise chaque semaine et pousse à rester constant plutôt que ponctuel." },
+  badges: { title:'🎖️ Badges', body:"Les badges se débloquent selon tes vraies données : nombre de séances, régularité, victoires, défis relevés... Classés par rareté (Bronze, Argent, Or, Légendaire) — certains badges légendaires sont secrets et ne se révèlent qu'une fois débloqués." },
+  advancedAnalysis: { title:'🔬 Analyse poussée', body:"Des statistiques plus fines sur tes séances (tendances, répartition, pics d'activité) calculées à partir de l'historique complet de tes données loguées." }
+};
+function helpBtn(key){
+  return `<button type="button" class="help-btn" data-help="${key}" aria-label="Aide">?</button>`;
+}
+function showHelpModal(key){
+  const info = HELP_CONTENT[key];
+  if(!info) return;
+  closeHelpModal();
+  const overlay = document.createElement('div');
+  overlay.className = 'help-overlay';
+  overlay.id = 'help-overlay';
+  overlay.innerHTML = `<div class="help-modal">
+    <h3>${info.title}</h3>
+    <p>${info.body}</p>
+    <button type="button" class="btn-secondary close-help-btn">Fermer</button>
+  </div>`;
+  overlay.addEventListener('click', (ev) => { if(ev.target === overlay) closeHelpModal(); });
+  document.body.appendChild(overlay);
+  overlay.querySelector('.close-help-btn').onclick = closeHelpModal;
+}
+function closeHelpModal(){
+  const el = document.getElementById('help-overlay');
+  if(el) el.remove();
 }
 function resetForm(){
   const disc = form.discipline;
@@ -1560,7 +1621,7 @@ function renderAdvice(){
   const programSection = `
     ${todayReminderBanner}
     <div class="card">
-      <div class="section-label">📅 Programme de la semaine</div>
+      <div class="section-label">📅 Programme de la semaine${helpBtn('program')}</div>
       <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">Structure générée à partir de ta jauge récente et de tes techniques — pas une vraie IA, une logique calculée sur tes données.</div>
       <label>Discipline</label>
       <div class="discipline-grid">
@@ -1684,7 +1745,7 @@ function renderAdvice(){
 
   const healthSection = `
     <div class="card">
-      <div class="section-label">🏥 Santé</div>
+      <div class="section-label">🏥 Santé${helpBtn('health')}</div>
       ${weightAlertBanner}
       ${recurringBanner}
       <div class="stat-grid" style="margin-bottom:12px;">
@@ -1736,7 +1797,7 @@ function renderAdvice(){
     })()}
 
     <div class="card">
-      <div class="section-label">🍽️ Nutrition</div>
+      <div class="section-label">🍽️ Nutrition${helpBtn('nutrition')}</div>
       <div class="stat-grid" style="margin-bottom:12px;">
         <div class="stat-box"><div class="num">${nutritionLog.length}</div><div class="lbl">📋 Repas loggés</div></div>
         <div class="stat-box"><div class="num">${nutritionLog.length && nutritionLog[nutritionLog.length-1].hydration ? nutritionLog[nutritionLog.length-1].hydration : '—'}</div><div class="lbl">💧 Dernière hydratation (L)</div></div>
@@ -1817,7 +1878,7 @@ function renderAdvice(){
     ${programSection}
     ${healthSection}
     <div class="card">
-      <div class="section-label">🎯 Objectifs & échéances</div>
+      <div class="section-label">🎯 Objectifs & échéances${helpBtn('goals')}</div>
       ${goalsList}
       <div class="add-goal-row">
         <input type="text" id="g-title" placeholder="ex : Europeans IBJJF">
@@ -1826,7 +1887,7 @@ function renderAdvice(){
       <button class="btn-secondary" id="add-goal-btn">+ Ajouter l'objectif</button>
     </div>
     <div class="card">
-      <div class="section-label">📤 Résumé pour ton coach</div>
+      <div class="section-label">📤 Résumé pour ton coach${helpBtn('coachSummary')}</div>
       <div style="font-size:13px; color:var(--text-muted);">Génère un résumé de tes 7 derniers jours à copier-coller pour ton coach ou tes partenaires d'entraînement.</div>
       <button class="btn-secondary" id="gen-summary-btn">Générer le résumé</button>
       <textarea id="coach-summary" readonly style="display:none;"></textarea>
@@ -1924,7 +1985,7 @@ function renderRankCard(rank){
   const divPct = rank.legend ? 100 : Math.min(100, (rank.xpIntoDivision/DIV_XP)*100);
   return `
   <div class="card" style="background:linear-gradient(135deg, ${rank.tier.color}22, transparent); border-color:${rank.tier.color}55;">
-    <div class="section-label">🏔️ Rang GRIT</div>
+    <div class="section-label">🏔️ Rang GRIT${helpBtn('rank')}</div>
     <div style="display:flex; align-items:center; gap:14px;">
       <div style="width:52px; height:52px; border-radius:50%; background:${rank.tier.color}; border:2px solid ${rank.tier.border||'var(--border)'}; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:'Outfit',sans-serif; font-weight:700; font-size:20px; color:${rank.tier.text};">${rank.tierIndex+1}</div>
       <div style="flex:1;">
@@ -2081,7 +2142,7 @@ function renderDailyChallengeCard(){
   const ch = ensureDailyChallenge();
   const doneToday = !!ch.done;
   return `<div class="card" id="daily-challenge-card" style="background: linear-gradient(135deg, rgba(255,90,69,0.08), transparent); border-color: rgba(255,90,69,0.3);">
-    <div class="section-label" style="color:var(--coral);">⚡ Défi GRIT du jour</div>
+    <div class="section-label" style="color:var(--coral);">⚡ Défi GRIT du jour${helpBtn('dailyChallenge')}</div>
     <div style="font-size:15.5px; font-weight:700; margin-bottom:4px;">${escapeHtml(ch.label)}</div>
     <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Choisi d'après ce que tu pratiques le plus — un nouveau défi chaque jour.</div>
     ${doneToday ? `
@@ -2098,7 +2159,7 @@ function renderWeeklyChallengeCard(){
   const pct = Math.min(100, (wc.count/wc.target)*100);
   const done = wc.count >= wc.target;
   return `<div class="card">
-    <div class="section-label">🎯 Défi de la semaine</div>
+    <div class="section-label">🎯 Défi de la semaine${helpBtn('weeklyChallenge')}</div>
     <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
       <div style="font-size:13.5px;">${done ? '✅ Défi complété !' : `${wc.count}/${wc.target} séances loguées`}</div>
     </div>
@@ -2858,7 +2919,7 @@ function renderProgress(){
     const badgesSection = `
       <div class="card">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-          <div class="section-label" style="margin:0;">🎖️ Badges</div>
+          <div class="section-label" style="margin:0;">🎖️ Badges${helpBtn('badges')}</div>
           <span style="font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace;">${totalUnlocked}/${BADGE_DEFS.length}</span>
         </div>
       </div>
@@ -2910,11 +2971,11 @@ function renderProgress(){
   const analysis = generateAnalysis(sorted);
   const analysisSection = analysis.length ? `
     <div class="card" style="background:linear-gradient(135deg, rgba(155,127,212,0.10), transparent); border-color:rgba(155,127,212,0.3);">
-      <div class="section-label">🔬 Analyse poussée</div>
+      <div class="section-label">🔬 Analyse poussée${helpBtn('advancedAnalysis')}</div>
       ${analysis.map(a => `<div class="tip-item"><div class="icon">${a.icon}</div><div class="body">${a.text}</div></div>`).join('')}
     </div>` : `
     <div class="card">
-      <div class="section-label">🔬 Analyse poussée</div>
+      <div class="section-label">🔬 Analyse poussée${helpBtn('advancedAnalysis')}</div>
       <div style="font-size:13px; color:var(--text-muted);">Pas encore assez de données pour une analyse fiable — reviens ici après quelques séances ou suivis de plus.</div>
     </div>`;
 
@@ -3023,6 +3084,7 @@ function render(){
 }
 
 function attachHandlers(){
+  document.querySelectorAll('[data-help]').forEach(b => b.onclick = () => showHelpModal(b.dataset.help));
   document.querySelectorAll('[data-act="set-lang"]').forEach(b => b.onclick = () => {
     currentLang = b.dataset.val;
     localStorage.setItem(LANG_KEY, currentLang);
