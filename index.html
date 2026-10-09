@@ -412,6 +412,9 @@ const PROGRAM_KEY = 'grit-weekly-program';
 const PROGRAM_COMPLETION_KEY = 'grit-program-completion';
 const CHALLENGE_KEY = 'grit-daily-challenge';
 const CHALLENGE_LOG_KEY = 'grit-challenge-log';
+const NUTRITION_CALC_KEY = 'grit-nutrition-calc';
+const MEALPLAN_KEY = 'grit-meal-plan';
+const MEALPLAN_COMPLETION_KEY = 'grit-meal-completion';
 let currentLang = localStorage.getItem(LANG_KEY) || 'fr';
 
 const I18N = {
@@ -667,6 +670,8 @@ let nutritionLog = [];
 let nutritionForm = { notes:'', hydration:'', digestion:'Bien', proteinG:'' };
 let nutritionProfile = { height:'', weightKg:'', age:'', sex:'homme', activity:'', goal:'maintien' };
 let nutritionCalcResult = null;
+let mealPlan = null;
+let mealPlanCompletion = {};
 let checkins = [];
 let checkinForm = { date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '' };
 let newMode = 'session';
@@ -788,7 +793,8 @@ const HELP_CONTENT = {
   dailyChallenge: { title:'⚡ Défi GRIT du jour', body:"Un défi différent chaque jour, basé sur l'exercice ou la technique que tu pratiques le plus. Valide-le une fois fait pour gagner de l'XP et avancer sur les badges liés aux défis (1, 7, 30 défis relevés)." },
   weeklyChallenge: { title:'🎯 Défi de la semaine', body:"Un objectif à atteindre sur 7 jours (nombre de séances, régularité...). Il se réinitialise chaque semaine et pousse à rester constant plutôt que ponctuel." },
   badges: { title:'🎖️ Badges', body:"Les badges se débloquent selon tes vraies données : nombre de séances, régularité, victoires, défis relevés... Classés par rareté (Bronze, Argent, Or, Légendaire) — certains badges légendaires sont secrets et ne se révèlent qu'une fois débloqués." },
-  advancedAnalysis: { title:'🔬 Analyse poussée', body:"Des statistiques plus fines sur tes séances (tendances, répartition, pics d'activité) calculées à partir de l'historique complet de tes données loguées." }
+  advancedAnalysis: { title:'🔬 Analyse poussée', body:"Des statistiques plus fines sur tes séances (tendances, répartition, pics d'activité) calculées à partir de l'historique complet de tes données loguées." },
+  mealPlan: { title:'🍱 Planificateur de repas', body:"À partir de tes besoins nutritionnels calculés et de ton objectif (perte, maintien, prise de masse, performance), l'app compose 4 repas concrets pour la journée avec des aliments et des quantités précises. Coche chaque repas une fois mangé pour un vrai suivi — le plan se renouvelle chaque jour." }
 };
 function helpBtn(key){
   return `<button type="button" class="help-btn" data-help="${key}" aria-label="Aide">?</button>`;
@@ -847,6 +853,141 @@ async function loadNutritionProfile(){
 async function saveNutritionProfile(){
   try{ localStorage.setItem(NUTRITION_PROFILE_KEY, JSON.stringify(nutritionProfile)); }
   catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+async function loadNutritionCalc(){
+  try{
+    const v = localStorage.getItem(NUTRITION_CALC_KEY);
+    nutritionCalcResult = v ? JSON.parse(v) : null;
+  }catch(e){ nutritionCalcResult = null; }
+}
+async function saveNutritionCalc(){
+  try{ localStorage.setItem(NUTRITION_CALC_KEY, JSON.stringify(nutritionCalcResult)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+async function loadMealPlanState(){
+  try{
+    const v = localStorage.getItem(MEALPLAN_KEY);
+    mealPlan = v ? JSON.parse(v) : null;
+  }catch(e){ mealPlan = null; }
+  try{
+    const v = localStorage.getItem(MEALPLAN_COMPLETION_KEY);
+    mealPlanCompletion = v ? JSON.parse(v) : {};
+  }catch(e){ mealPlanCompletion = {}; }
+}
+async function saveMealPlanState(){
+  try{ localStorage.setItem(MEALPLAN_KEY, JSON.stringify(mealPlan)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+async function saveMealPlanCompletion(){
+  try{ localStorage.setItem(MEALPLAN_COMPLETION_KEY, JSON.stringify(mealPlanCompletion)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+
+// ---- Planificateur de repas : compose des repas concrets à partir des besoins nutritionnels calculés et de l'objectif ----
+const PROTEIN_SOURCES = [
+  { name:'blanc de poulet', protein:31, kcal:165 },
+  { name:'œufs entiers', protein:13, kcal:155 },
+  { name:'thon au naturel', protein:26, kcal:116 },
+  { name:'tofu ferme', protein:15, kcal:144 },
+  { name:'skyr / fromage blanc 0%', protein:10, kcal:60 },
+  { name:'saumon', protein:20, kcal:208 },
+  { name:'steak haché 5%', protein:21, kcal:137 },
+  { name:'lentilles cuites', protein:9, kcal:116 }
+];
+const CARB_SOURCES = [
+  { name:'riz complet cuit', carbs:23, kcal:111 },
+  { name:'patate douce', carbs:20, kcal:86 },
+  { name:"flocons d'avoine", carbs:60, kcal:375 },
+  { name:'pâtes complètes cuites', carbs:25, kcal:124 },
+  { name:'pain complet', carbs:41, kcal:247 },
+  { name:'quinoa cuit', carbs:21, kcal:120 }
+];
+const FAT_SOURCES = [
+  { name:"huile d'olive", fat:100, kcal:884 },
+  { name:'amandes', fat:49, kcal:579 },
+  { name:'avocat', fat:15, kcal:160 },
+  { name:'beurre de cacahuète', fat:50, kcal:588 }
+];
+const MEALPLAN_VEGGIES = ['brocolis','épinards','haricots verts','poivrons','courgettes','salade verte','tomates','carottes'];
+const MEAL_TYPES = [
+  { key:'petit-dej', label:'🌅 Petit-déjeuner', share:0.25 },
+  { key:'dejeuner', label:'☀️ Déjeuner', share:0.35 },
+  { key:'collation', label:'🍎 Collation', share:0.10 },
+  { key:'diner', label:'🌙 Dîner', share:0.30 }
+];
+function pickDaily(list, seed, offset){
+  return list[(seed + offset) % list.length];
+}
+function gramsFor(macroPer100, targetG){
+  if(!macroPer100 || targetG <= 0) return 0;
+  return Math.max(0, Math.round(targetG / macroPer100 * 100));
+}
+function generateMealPlan(needs, goalKey){
+  const seed = dayOfYear();
+  const meals = MEAL_TYPES.map((mt, i) => {
+    const targetProtein = Math.round(needs.protein * mt.share);
+    const targetCarbs = Math.round(needs.carbs * mt.share);
+    const targetFat = Math.round(needs.fat * mt.share);
+    const targetCalories = Math.round(needs.calories * mt.share);
+    const proteinFood = pickDaily(PROTEIN_SOURCES, seed, i);
+    const carbFood = pickDaily(CARB_SOURCES, seed, i + 2);
+    const fatFood = pickDaily(FAT_SOURCES, seed, i + 1);
+    const veggie = pickDaily(MEALPLAN_VEGGIES, seed, i + 3);
+    const proteinG = gramsFor(proteinFood.protein, targetProtein);
+    const fatG = gramsFor(fatFood.fat, Math.round(targetFat * 0.4));
+    let text;
+    if(mt.key === 'collation'){
+      text = `${proteinFood.name} (${proteinG}g) avec ${fatFood.name} (${fatG}g)`;
+    } else {
+      const carbsG = gramsFor(carbFood.carbs, targetCarbs);
+      text = `${proteinFood.name} (${proteinG}g) + ${carbFood.name} (${carbsG}g) + ${veggie} à volonté`;
+      if(fatG >= 5) text += ` + ${fatFood.name} (${fatG}g)`;
+    }
+    return {
+      id: mt.key,
+      label: mt.label,
+      text,
+      macros: { calories: targetCalories, protein: targetProtein, carbs: targetCarbs, fat: targetFat }
+    };
+  });
+  return { date: todayStr(), goal: goalKey, meals };
+}
+function ensureMealPlan(){
+  if(!nutritionCalcResult) return null;
+  if(!mealPlan || mealPlan.date !== todayStr() || mealPlan.goal !== nutritionProfile.goal){
+    mealPlan = generateMealPlan(nutritionCalcResult, nutritionProfile.goal);
+    saveMealPlanState();
+  }
+  return mealPlan;
+}
+function renderMealPlanCard(){
+  const plan = ensureMealPlan();
+  if(!plan){
+    return `<div class="card">
+      <div class="section-label">🍱 Planificateur de repas${helpBtn('mealPlan')}</div>
+      <div style="font-size:13.5px; color:var(--text-muted); line-height:1.5;">Calcule d'abord tes besoins nutritionnels juste en dessous (taille, poids, âge, objectif) pour obtenir un plan de repas concret avec les quantités précises à manger aujourd'hui.</div>
+    </div>`;
+  }
+  const dateKey = plan.date;
+  const doneMap = mealPlanCompletion[dateKey] || {};
+  const doneCount = plan.meals.filter(m => doneMap[m.id]).length;
+  const goalInfo = GOAL_OPTIONS.find(g => g.key === plan.goal) || GOAL_OPTIONS[1];
+  return `<div class="card">
+    <div class="section-label">🍱 Planificateur de repas${helpBtn('mealPlan')}</div>
+    <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px; font-family:'IBM Plex Mono',monospace;">${goalInfo.label} · ~${nutritionCalcResult.calories} kcal/jour</div>
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">${doneCount}/${plan.meals.length} repas suivis aujourd'hui</div>
+    ${plan.meals.map(m => `
+      <div style="display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);">
+        <input type="checkbox" data-act="toggle-meal" data-id="${m.id}" ${doneMap[m.id] ? 'checked' : ''} style="margin-top:3px; width:18px; height:18px; flex-shrink:0; accent-color:var(--teal);">
+        <div style="flex:1;">
+          <div style="font-size:13.5px; font-weight:600; ${doneMap[m.id] ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${m.label}</div>
+          <div style="font-size:13px; color:var(--text); margin-top:2px; ${doneMap[m.id] ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${m.text}</div>
+          <div style="font-size:10.5px; color:var(--text-muted); margin-top:4px; font-family:'IBM Plex Mono',monospace;">~${m.macros.calories} kcal · ${m.macros.protein}g P · ${m.macros.carbs}g G · ${m.macros.fat}g L</div>
+        </div>
+      </div>
+    `).join('')}
+    <div style="font-size:11px; color:var(--text-muted); margin-top:12px; opacity:0.8;">Plan généré à partir de tes besoins calculés, renouvelé chaque jour — adapte les aliments à tes goûts et contraintes, ce n'est pas un plan nutritionnel médical.</div>
+  </div>`;
 }
 const ACTIVITY_LEVELS = [
   { key:'sedentaire', label:'Sédentaire', hint:'peu ou pas de sport', multiplier:1.2 },
@@ -1877,6 +2018,7 @@ function renderAdvice(){
     ${hero}
     ${programSection}
     ${healthSection}
+    ${renderMealPlanCard()}
     <div class="card">
       <div class="section-label">🎯 Objectifs & échéances${helpBtn('goals')}</div>
       ${goalsList}
@@ -3236,10 +3378,26 @@ function attachHandlers(){
     const result = computeNutrientNeeds(nutritionProfile);
     if(!result){ showToast('Renseigne taille, poids et âge'); return; }
     nutritionCalcResult = result;
+    mealPlan = null;
     await saveNutritionProfile();
+    await saveNutritionCalc();
+    await saveMealPlanState();
     render();
     showToast('Besoins calculés 🧮');
   };
+  document.querySelectorAll('[data-act="toggle-meal"]').forEach(cb => cb.onchange = () => {
+    const id = cb.dataset.id;
+    const dateKey = mealPlan ? mealPlan.date : todayStr();
+    if(!mealPlanCompletion[dateKey]) mealPlanCompletion[dateKey] = {};
+    if(cb.checked){
+      mealPlanCompletion[dateKey][id] = true;
+      showToast('Repas suivi 🍽️');
+    } else {
+      delete mealPlanCompletion[dateKey][id];
+    }
+    saveMealPlanCompletion();
+    render();
+  });
 
   document.querySelectorAll('[data-act="program-discipline"]').forEach(b => b.onclick = () => {
     programDiscipline = b.dataset.val;
@@ -3434,6 +3592,8 @@ function startApp(){
   loadHealth().then(render);
   loadNutrition().then(render);
   loadNutritionProfile().then(render);
+  loadNutritionCalc().then(render);
+  loadMealPlanState().then(render);
   loadCheckins().then(render);
   registerServiceWorker();
   trackEvent('session_start', {});
