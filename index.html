@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>GRIT</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#e0a422">
+<meta name="theme-color" content="#0d0e13">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -14,22 +14,25 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #fff6ee;
-    --surface: #ffffff;
-    --surface-2: #fbeee0;
-    --border: #f3ddc9;
-    --text: #22263a;
-    --text-muted: #8b8fa3;
-    --coral: #e5383b;
-    --gold: #e0a422;
-    --teal: #2f8f8a;
-    --green: #2fb380;
-    --purple: #8a6fd6;
+    --bg: #0d0e13;
+    --surface: #181a22;
+    --surface-2: #22242e;
+    --border: #2d2f3b;
+    --text: #f2f1ec;
+    --text-muted: #9496a8;
+    --coral: #ff6b5c;
+    --gold: #f2b84e;
+    --teal: #4fd1c5;
+    --green: #3ddc97;
+    --purple: #a78bfa;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{margin:0; padding:0;}
   body{
-    background: linear-gradient(180deg, #fffaf5 0%, #fef2e8 45%, #fdece0 100%);
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -5%, rgba(255,107,92,0.10), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(79,209,197,0.08), transparent 55%),
+      linear-gradient(180deg, #121319 0%, #0d0e13 45%, #0a0b0f 100%);
     background-attachment: fixed;
     color: var(--text);
     font-family: 'Poppins', sans-serif;
@@ -114,7 +117,7 @@
     display:flex;
     z-index: 20;
     padding-bottom: env(safe-area-inset-bottom, 0);
-    box-shadow: 0 -4px 16px rgba(0,0,0,0.05);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.35);
   }
   .tab{
     flex:1; text-align:center; padding: 13px 0 10px;
@@ -135,7 +138,7 @@
     border-radius: 20px;
     padding: 18px;
     margin-bottom: 14px;
-    box-shadow: 0 6px 20px rgba(34,38,58,0.06);
+    box-shadow: 0 6px 22px rgba(0,0,0,0.35);
   }
 
   .coach-card{
@@ -209,7 +212,7 @@
     background: var(--coral);
     color: #fff; font-family:'Outfit', sans-serif; font-size: 15px; font-weight: 600;
     letter-spacing: -0.005em; margin-top: 18px; cursor: pointer;
-    box-shadow: 0 4px 14px rgba(229,56,59,0.22);
+    box-shadow: 0 4px 18px rgba(255,107,92,0.3);
     transition: transform 0.12s ease;
   }
   .btn-primary:active{ transform: scale(0.97); }
@@ -240,7 +243,7 @@
   .empty{ text-align:center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; }
 
   .stat-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-  .stat-box{ background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px; box-shadow: 0 4px 14px rgba(34,38,58,0.05); }
+  .stat-box{ background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
   .stat-box .num{ font-family:'Outfit', sans-serif; font-weight: 700; font-size: 28px; color: var(--gold); line-height: 1; letter-spacing: -0.01em; }
   .stat-box .lbl{ font-family:'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); letter-spacing: 0.05em; margin-top: 6px; }
 
@@ -415,6 +418,7 @@ const CHALLENGE_LOG_KEY = 'grit-challenge-log';
 const NUTRITION_CALC_KEY = 'grit-nutrition-calc';
 const MEALPLAN_KEY = 'grit-meal-plan';
 const MEALPLAN_COMPLETION_KEY = 'grit-meal-completion';
+const TODAY_SESSION_COMPLETION_KEY = 'grit-today-session-completion';
 let currentLang = localStorage.getItem(LANG_KEY) || 'fr';
 
 const I18N = {
@@ -672,6 +676,7 @@ let nutritionProfile = { height:'', weightKg:'', age:'', sex:'homme', activity:'
 let nutritionCalcResult = null;
 let mealPlan = null;
 let mealPlanCompletion = {};
+let todaySessionCompletion = {};
 let checkins = [];
 let checkinForm = { date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '' };
 let newMode = 'session';
@@ -794,7 +799,8 @@ const HELP_CONTENT = {
   weeklyChallenge: { title:'🎯 Défi de la semaine', body:"Un objectif à atteindre sur 7 jours (nombre de séances, régularité...). Il se réinitialise chaque semaine et pousse à rester constant plutôt que ponctuel." },
   badges: { title:'🎖️ Badges', body:"Les badges se débloquent selon tes vraies données : nombre de séances, régularité, victoires, défis relevés... Classés par rareté (Bronze, Argent, Or, Légendaire) — certains badges légendaires sont secrets et ne se révèlent qu'une fois débloqués." },
   advancedAnalysis: { title:'🔬 Analyse poussée', body:"Des statistiques plus fines sur tes séances (tendances, répartition, pics d'activité) calculées à partir de l'historique complet de tes données loguées." },
-  mealPlan: { title:'🍱 Planificateur de repas', body:"À partir de tes besoins nutritionnels calculés et de ton objectif (perte, maintien, prise de masse, performance), l'app compose 4 repas concrets pour la journée avec des aliments et des quantités précises. Coche chaque repas une fois mangé pour un vrai suivi — le plan se renouvelle chaque jour." }
+  mealPlan: { title:'🍱 Planificateur de repas', body:"À partir de tes besoins nutritionnels calculés et de ton objectif (perte, maintien, prise de masse, performance), l'app compose 4 repas concrets pour la journée avec des aliments et des quantités précises. Coche chaque repas une fois mangé pour un vrai suivi — le plan se renouvelle chaque jour." },
+  todayTraining: { title:'🏋️ Entraînement du jour', body:"Si tu as un programme de la semaine actif, cette carte affiche directement la séance du jour prévue dedans. Sinon, l'app te propose automatiquement une séance complète (échauffement, exercice selon ta pratique, retour au calme) basée sur ta discipline la plus pratiquée. Coche-la une fois faite." }
 };
 function helpBtn(key){
   return `<button type="button" class="help-btn" data-help="${key}" aria-label="Aide">?</button>`;
@@ -989,6 +995,74 @@ function renderMealPlanCard(){
     <div style="font-size:11px; color:var(--text-muted); margin-top:12px; opacity:0.8;">Plan généré à partir de tes besoins calculés, renouvelé chaque jour — adapte les aliments à tes goûts et contraintes, ce n'est pas un plan nutritionnel médical.</div>
   </div>`;
 }
+
+// ---- Entraînement du jour : jour du programme actif si dispo, sinon séance autonome générée (échauffement + exercice selon la pratique + retour au calme) ----
+async function loadTodaySessionState(){
+  try{
+    const v = localStorage.getItem(TODAY_SESSION_COMPLETION_KEY);
+    todaySessionCompletion = v ? JSON.parse(v) : {};
+  }catch(e){ todaySessionCompletion = {}; }
+}
+async function saveTodaySessionState(){
+  try{ localStorage.setItem(TODAY_SESSION_COMPLETION_KEY, JSON.stringify(todaySessionCompletion)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+function generateStandaloneSession(){
+  const sortedEntries = [...entries].sort((a,b) => b.date.localeCompare(a.date));
+  const discipline = programDiscipline || (sortedEntries.length ? sortedEntries[0].discipline : null);
+  const category = discipline ? (DISCIPLINE_CATEGORY[discipline] || 'general') : mainDisciplineCategory(entries);
+  const library = discipline ? (EXERCISE_LIBRARY[discipline] || []) : [];
+  const seed = dayOfYear();
+  const picks = [];
+  if(library.length){
+    picks.push(library[seed % library.length]);
+    if(library.length > 1) picks.push(library[(seed + 1) % library.length]);
+  }
+  const exercises = buildExerciseBlock(category, 'Technique', picks);
+  return { date: todayStr(), discipline, exercises, duration: SESSION_DURATION['Technique'] };
+}
+function renderTodayTrainingCard(){
+  const todayKey = todayStr();
+  let programDay = null;
+  if(generatedProgram && generatedProgram.days){
+    programDay = generatedProgram.days.find(d => d.dateStr === todayKey);
+  }
+  if(programDay && !programDay.isRest){
+    const done = !!programCompletion[programDay.dateStr];
+    return `<div class="card" style="background: linear-gradient(135deg, rgba(79,209,197,0.08), transparent); border-color: rgba(79,209,197,0.3);">
+      <div class="section-label" style="color:var(--teal);">🏋️ Entraînement du jour${helpBtn('todayTraining')}</div>
+      <div style="font-size:15px; font-weight:700; margin-bottom:4px;">${programDay.icon} ${programDay.type}${programDay.detail ? ' — ' + escapeHtml(programDay.detail) : ''}</div>
+      ${programDay.duration ? `<div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">${programDay.duration}</div>` : ''}
+      ${programDay.exercises.map(ex => `<div class="tip-item"><div class="icon">🎯</div><div class="body">${escapeHtml(ex)}</div></div>`).join('')}
+      <label style="display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer;">
+        <input type="checkbox" data-act="toggle-program-day" data-date="${programDay.dateStr}" ${done ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--teal);">
+        <span style="font-size:13px; color:var(--text);">${done ? 'Séance validée 💪' : 'Marquer comme faite'}</span>
+      </label>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:10px; opacity:0.8;">Tiré de ton programme de la semaine actif.</div>
+    </div>`;
+  }
+  const session = generateStandaloneSession();
+  if(!session.exercises.length){
+    return `<div class="card">
+      <div class="section-label">🏋️ Entraînement du jour${helpBtn('todayTraining')}</div>
+      <div style="font-size:13.5px; color:var(--text-muted); line-height:1.5;">Logue quelques séances pour recevoir une proposition d'entraînement personnalisée selon ta pratique.</div>
+    </div>`;
+  }
+  const done = !!todaySessionCompletion[session.date];
+  const discInfo = session.discipline ? disciplineInfo(session.discipline) : null;
+  return `<div class="card" style="background: linear-gradient(135deg, rgba(79,209,197,0.08), transparent); border-color: rgba(79,209,197,0.3);">
+    <div class="section-label" style="color:var(--teal);">🏋️ Entraînement du jour${helpBtn('todayTraining')}</div>
+    <div style="font-size:15px; font-weight:700; margin-bottom:4px;">${discInfo ? discInfo.emoji + ' ' + discInfo.name : 'Séance suggérée'}</div>
+    ${session.duration ? `<div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">${session.duration}</div>` : ''}
+    ${session.exercises.map(ex => `<div class="tip-item"><div class="icon">🎯</div><div class="body">${escapeHtml(ex)}</div></div>`).join('')}
+    <label style="display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer;">
+      <input type="checkbox" data-act="toggle-today-session" ${done ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--teal);">
+      <span style="font-size:13px; color:var(--text);">${done ? 'Séance validée 💪' : "J'ai fait cette séance"}</span>
+    </label>
+    <div style="font-size:11px; color:var(--text-muted); margin-top:10px; opacity:0.8;">Suggestion générée selon ta discipline la plus pratiquée — renouvelée chaque jour. Génère un programme de la semaine pour un suivi plus complet.</div>
+  </div>`;
+}
+
 const ACTIVITY_LEVELS = [
   { key:'sedentaire', label:'Sédentaire', hint:'peu ou pas de sport', multiplier:1.2 },
   { key:'leger', label:'Léger', hint:'1-3 séances/sem', multiplier:1.375 },
@@ -1862,8 +1936,8 @@ function renderAdvice(){
     <div class="entry">
       <div class="entry-top">
         <span class="entry-date">${formatDate(n.date)}</span>
-        ${n.proteinG ? `<span class="tag" style="background:#e5383b1a; color:var(--coral)">🥩 ${n.proteinG}g</span>` : ''}
-        ${n.hydration ? `<span class="tag" style="background:#3ec9c022; color:var(--teal)">💧 ${n.hydration}L</span>` : ''}
+        ${n.proteinG ? `<span class="tag" style="background:color-mix(in srgb, var(--coral) 16%, transparent); color:var(--coral)">🥩 ${n.proteinG}g</span>` : ''}
+        ${n.hydration ? `<span class="tag" style="background:color-mix(in srgb, var(--teal) 16%, transparent); color:var(--teal)">💧 ${n.hydration}L</span>` : ''}
       </div>
       ${n.digestion ? `<div style="font-size:12.5px; color:var(--text-muted);">Digestion : ${escapeHtml(n.digestion)}</div>` : ''}
       ${n.notes ? `<div class="entry-note">${escapeHtml(n.notes)}</div>` : ''}
@@ -2356,6 +2430,7 @@ function renderNew(){
   return `
   ${modeToggle}
   ${renderDailyChallengeCard()}
+  ${renderTodayTrainingCard()}
   ${renderQuoteCard()}
   ${renderWeeklyChallengeCard()}
   ${renderThrowbackCard()}
@@ -2454,7 +2529,7 @@ function renderHistory(){
       <div class="entry">
         <div class="entry-top">
           <span class="entry-date">${formatDate(c.date)}</span>
-          <div class="entry-tags"><span class="tag" style="background:#6b8fa322; color:#6b8fa3">🩺 Suivi santé</span></div>
+          <div class="entry-tags"><span class="tag" style="background:color-mix(in srgb, #8fa9c2 18%, transparent); color:#8fa9c2">🩺 Suivi santé</span></div>
         </div>
         <div class="entry-stats">
           ${c.weight ? `<span><b>${c.weight}</b> kg</span>` : ''}
@@ -2485,7 +2560,7 @@ function renderHistory(){
       <div class="entry">
         <div class="entry-top">
           <span class="entry-date">${formatDate(c.date)}</span>
-          <div class="entry-tags"><span class="tag" style="background:#6b8fa322; color:#6b8fa3">🩺 Suivi santé</span></div>
+          <div class="entry-tags"><span class="tag" style="background:color-mix(in srgb, #8fa9c2 18%, transparent); color:#8fa9c2">🩺 Suivi santé</span></div>
         </div>
         <div class="entry-stats">
           ${c.weight ? `<span><b>${c.weight}</b> kg</span>` : ''}
@@ -3398,6 +3473,15 @@ function attachHandlers(){
     saveMealPlanCompletion();
     render();
   });
+  const toggleTodaySessionEl = document.querySelector('[data-act="toggle-today-session"]');
+  if(toggleTodaySessionEl) toggleTodaySessionEl.onchange = (e) => {
+    const today = todayStr();
+    todaySessionCompletion[today] = e.target.checked;
+    if(!e.target.checked) delete todaySessionCompletion[today];
+    if(e.target.checked) showToast('Séance validée 💪');
+    saveTodaySessionState();
+    render();
+  };
 
   document.querySelectorAll('[data-act="program-discipline"]').forEach(b => b.onclick = () => {
     programDiscipline = b.dataset.val;
@@ -3594,6 +3678,7 @@ function startApp(){
   loadNutritionProfile().then(render);
   loadNutritionCalc().then(render);
   loadMealPlanState().then(render);
+  loadTodaySessionState().then(render);
   loadCheckins().then(render);
   registerServiceWorker();
   trackEvent('session_start', {});
