@@ -419,6 +419,7 @@ const NUTRITION_CALC_KEY = 'grit-nutrition-calc';
 const MEALPLAN_KEY = 'grit-meal-plan';
 const MEALPLAN_COMPLETION_KEY = 'grit-meal-completion';
 const TODAY_SESSION_COMPLETION_KEY = 'grit-today-session-completion';
+const TODAY_SESSION_CUSTOM_KEY = 'grit-today-session-custom';
 let currentLang = localStorage.getItem(LANG_KEY) || 'fr';
 
 const I18N = {
@@ -659,6 +660,8 @@ const EXERCISE_LIBRARY = {
   'Yoga/Pilates': ['Salutation au soleil','Équilibre','Étirements','Renforcement du gainage','Respiration/méditation'],
   'Autre': []
 };
+const WARMUP_LIBRARY = ['Rotations articulaires','Jumping jacks','Gainage dynamique léger','Mobilité des hanches','Corde à sauter','Vélo ou rameur léger','Étirements dynamiques','Shadow / drilling léger'];
+const COOLDOWN_LIBRARY = ['Étirements statiques','Respiration / relaxation','Marche légère','Mobilité articulaire','Foam rolling / auto-massage'];
 const FUEL_LEVELS = [
   { emoji:'😣', label:'Épuisé', color:'#e2532d' },
   { emoji:'😕', label:'Bas', color:'#d97a3f' },
@@ -677,6 +680,9 @@ let nutritionCalcResult = null;
 let mealPlan = null;
 let mealPlanCompletion = {};
 let todaySessionCompletion = {};
+let todaySessionCustom = {};
+let sessionBuilderOpen = false;
+let sessionBuilderDraft = null;
 let checkins = [];
 let checkinForm = { date: todayStr(), weight: '', sleepHours: '', feeling: 3, note: '' };
 let newMode = 'session';
@@ -1007,6 +1013,21 @@ async function saveTodaySessionState(){
   try{ localStorage.setItem(TODAY_SESSION_COMPLETION_KEY, JSON.stringify(todaySessionCompletion)); }
   catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
 }
+async function loadTodaySessionCustom(){
+  try{
+    const v = localStorage.getItem(TODAY_SESSION_CUSTOM_KEY);
+    todaySessionCustom = v ? JSON.parse(v) : {};
+  }catch(e){ todaySessionCustom = {}; }
+}
+async function saveTodaySessionCustom(){
+  try{ localStorage.setItem(TODAY_SESSION_CUSTOM_KEY, JSON.stringify(todaySessionCustom)); }
+  catch(e){ console.error('storage error', e); showToast('⚠️ Sauvegarde impossible, exporte tes données'); }
+}
+function newSessionBuilderDraft(){
+  const sortedEntries = [...entries].sort((a,b) => b.date.localeCompare(a.date));
+  const discipline = programDiscipline || (sortedEntries.length ? sortedEntries[0].discipline : 'BJJ');
+  return { discipline, warmup: [], main: [], cooldown: [], pickBlock: 'warmup', pickName: '', pickSeries: '3' };
+}
 function generateStandaloneSession(){
   const sortedEntries = [...entries].sort((a,b) => b.date.localeCompare(a.date));
   const discipline = programDiscipline || (sortedEntries.length ? sortedEntries[0].discipline : null);
@@ -1021,8 +1042,80 @@ function generateStandaloneSession(){
   const exercises = buildExerciseBlock(category, 'Technique', picks);
   return { date: todayStr(), discipline, exercises, duration: SESSION_DURATION['Technique'] };
 }
-function renderTodayTrainingCard(){
+const SESSION_BLOCK_LABELS = { warmup: 'Échauffement', main: 'Exercices', cooldown: 'Retour au calme' };
+function renderSessionBuilder(){
+  const d = sessionBuilderDraft || (sessionBuilderDraft = newSessionBuilderDraft());
+  const disciplineOptions = DISCIPLINES.map(x => x.name);
+  const libraryForPick = d.pickBlock === 'main' ? (EXERCISE_LIBRARY[d.discipline] || []) : d.pickBlock === 'warmup' ? WARMUP_LIBRARY : COOLDOWN_LIBRARY;
+  const blockList = (key) => (d[key].length ? d[key].map((ex, i) => `
+    <div class="tip-item" style="align-items:center;">
+      <div class="icon">🎯</div>
+      <div class="body" style="flex:1;">${escapeHtml(ex.name)}${ex.series ? ` <span style="color:var(--text-muted);">· ${escapeHtml(String(ex.series))} séries</span>` : ''}</div>
+      <button type="button" data-act="builder-remove" data-block="${key}" data-idx="${i}" style="background:none; border:none; color:var(--coral); font-size:17px; cursor:pointer; padding:2px 8px; line-height:1;">×</button>
+    </div>`).join('') : `<div style="font-size:12.5px; color:var(--text-muted); padding:2px 0;">Aucun exercice ajouté.</div>`);
+
+  return `<div class="card" style="background: linear-gradient(135deg, rgba(79,209,197,0.08), transparent); border-color: rgba(79,209,197,0.3);">
+    <div class="section-label" style="color:var(--teal);">📝 Créer ma séance${helpBtn('todayTraining')}</div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">Discipline</label>
+      <select data-act="builder-discipline" style="width:100%; padding:10px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-size:13.5px;">
+        ${disciplineOptions.map(n => `<option value="${escapeHtml(n)}" ${n === d.discipline ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}
+      </select>
+    </div>
+    ${['warmup','main','cooldown'].map(key => `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12.5px; font-weight:700; color:var(--text); margin-bottom:6px;">${SESSION_BLOCK_LABELS[key]}</div>
+        ${blockList(key)}
+      </div>`).join('')}
+    <div style="border-top:1px solid var(--border); padding-top:14px; margin-top:4px;">
+      <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">Ajouter un exercice à :</label>
+      <select data-act="builder-pick-block" style="width:100%; padding:10px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-size:13.5px; margin-bottom:8px;">
+        ${Object.entries(SESSION_BLOCK_LABELS).map(([k,label]) => `<option value="${k}" ${k === d.pickBlock ? 'selected' : ''}>${label}</option>`).join('')}
+      </select>
+      <select data-act="builder-pick-name" style="width:100%; padding:10px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-size:13.5px; margin-bottom:8px;">
+        <option value="">— choisir dans la liste —</option>
+        ${libraryForPick.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}
+      </select>
+      <input type="text" data-act="builder-custom-name" placeholder="Ou tape un exercice perso" style="width:100%; padding:10px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-size:13.5px; margin-bottom:8px; box-sizing:border-box;">
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="number" min="1" max="20" data-act="builder-series" placeholder="Séries" value="${escapeHtml(d.pickSeries)}" style="width:90px; padding:10px; border-radius:10px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); font-size:13.5px;">
+        <button type="button" data-act="builder-add" class="btn-primary" style="flex:1; padding:10px 16px;">Ajouter</button>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:16px;">
+      <button type="button" data-act="builder-save" class="btn-primary" style="flex:1;">Enregistrer ma séance</button>
+      <button type="button" data-act="builder-cancel" class="btn-secondary" style="flex:1;">Annuler</button>
+    </div>
+  </div>`;
+}
+function renderCustomSessionCard(custom){
   const todayKey = todayStr();
+  const done = !!todaySessionCompletion[todayKey];
+  const discInfo = custom.discipline ? disciplineInfo(custom.discipline) : null;
+  const blockHtml = (key) => (custom[key] || []).map(ex => `<div class="tip-item"><div class="icon">🎯</div><div class="body">${escapeHtml(ex.name)}${ex.series ? ` <span style="color:var(--text-muted);">· ${escapeHtml(String(ex.series))} séries</span>` : ''}</div></div>`).join('');
+  return `<div class="card" style="background: linear-gradient(135deg, rgba(79,209,197,0.08), transparent); border-color: rgba(79,209,197,0.3);">
+    <div class="section-label" style="color:var(--teal);">🏋️ Entraînement du jour${helpBtn('todayTraining')}</div>
+    <div style="font-size:11px; color:var(--teal); font-weight:700; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px;">Séance créée par toi</div>
+    <div style="font-size:15px; font-weight:700; margin-bottom:10px;">${discInfo ? discInfo.emoji + ' ' + discInfo.name : 'Ma séance'}</div>
+    ${['warmup','main','cooldown'].filter(k => (custom[k]||[]).length).map(k => `
+      <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin:8px 0 4px;">${SESSION_BLOCK_LABELS[k]}</div>
+      ${blockHtml(k)}`).join('')}
+    <label style="display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer;">
+      <input type="checkbox" data-act="toggle-today-session" ${done ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--teal);">
+      <span style="font-size:13px; color:var(--text);">${done ? 'Séance validée 💪' : "J'ai fait cette séance"}</span>
+    </label>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button type="button" data-act="builder-edit" class="btn-secondary" style="flex:1; font-size:12.5px; padding:9px;">Modifier</button>
+      <button type="button" data-act="builder-reset" class="btn-secondary" style="flex:1; font-size:12.5px; padding:9px;">Séance proposée à la place</button>
+    </div>
+  </div>`;
+}
+function renderTodayTrainingCard(){
+  if(sessionBuilderOpen) return renderSessionBuilder();
+  const todayKey = todayStr();
+  const custom = todaySessionCustom[todayKey];
+  if(custom) return renderCustomSessionCard(custom);
+
   let programDay = null;
   if(generatedProgram && generatedProgram.days){
     programDay = generatedProgram.days.find(d => d.dateStr === todayKey);
@@ -1039,13 +1132,15 @@ function renderTodayTrainingCard(){
         <span style="font-size:13px; color:var(--text);">${done ? 'Séance validée 💪' : 'Marquer comme faite'}</span>
       </label>
       <div style="font-size:11px; color:var(--text-muted); margin-top:10px; opacity:0.8;">Tiré de ton programme de la semaine actif.</div>
+      <button type="button" data-act="builder-open" class="btn-secondary" style="width:100%; margin-top:10px; font-size:12.5px; padding:9px;">📝 Créer ma propre séance à la place</button>
     </div>`;
   }
   const session = generateStandaloneSession();
   if(!session.exercises.length){
     return `<div class="card">
       <div class="section-label">🏋️ Entraînement du jour${helpBtn('todayTraining')}</div>
-      <div style="font-size:13.5px; color:var(--text-muted); line-height:1.5;">Logue quelques séances pour recevoir une proposition d'entraînement personnalisée selon ta pratique.</div>
+      <div style="font-size:13.5px; color:var(--text-muted); line-height:1.5; margin-bottom:12px;">Logue quelques séances pour recevoir une proposition d'entraînement personnalisée selon ta pratique.</div>
+      <button type="button" data-act="builder-open" class="btn-secondary" style="width:100%; font-size:12.5px; padding:9px;">📝 Créer ma propre séance</button>
     </div>`;
   }
   const done = !!todaySessionCompletion[session.date];
@@ -1060,6 +1155,7 @@ function renderTodayTrainingCard(){
       <span style="font-size:13px; color:var(--text);">${done ? 'Séance validée 💪' : "J'ai fait cette séance"}</span>
     </label>
     <div style="font-size:11px; color:var(--text-muted); margin-top:10px; opacity:0.8;">Suggestion générée selon ta discipline la plus pratiquée — renouvelée chaque jour. Génère un programme de la semaine pour un suivi plus complet.</div>
+    <button type="button" data-act="builder-open" class="btn-secondary" style="width:100%; margin-top:10px; font-size:12.5px; padding:9px;">📝 Créer ma propre séance à la place</button>
   </div>`;
 }
 
@@ -3482,6 +3578,78 @@ function attachHandlers(){
     saveTodaySessionState();
     render();
   };
+  const builderOpenEl = document.querySelector('[data-act="builder-open"]');
+  if(builderOpenEl) builderOpenEl.onclick = () => {
+    sessionBuilderDraft = newSessionBuilderDraft();
+    sessionBuilderOpen = true;
+    render();
+  };
+  const builderEditEl = document.querySelector('[data-act="builder-edit"]');
+  if(builderEditEl) builderEditEl.onclick = () => {
+    const existing = todaySessionCustom[todayStr()];
+    sessionBuilderDraft = existing
+      ? { discipline: existing.discipline, warmup: [...(existing.warmup||[])], main: [...(existing.main||[])], cooldown: [...(existing.cooldown||[])], pickBlock: 'warmup', pickName: '', pickSeries: '3' }
+      : newSessionBuilderDraft();
+    sessionBuilderOpen = true;
+    render();
+  };
+  const builderResetEl = document.querySelector('[data-act="builder-reset"]');
+  if(builderResetEl) builderResetEl.onclick = () => {
+    delete todaySessionCustom[todayStr()];
+    saveTodaySessionCustom();
+    showToast('Retour à la séance proposée');
+    render();
+  };
+  const builderCancelEl = document.querySelector('[data-act="builder-cancel"]');
+  if(builderCancelEl) builderCancelEl.onclick = () => {
+    sessionBuilderOpen = false;
+    sessionBuilderDraft = null;
+    render();
+  };
+  const builderDisciplineEl = document.querySelector('[data-act="builder-discipline"]');
+  if(builderDisciplineEl) builderDisciplineEl.onchange = (e) => {
+    sessionBuilderDraft.discipline = e.target.value;
+    render();
+  };
+  const builderPickBlockEl = document.querySelector('[data-act="builder-pick-block"]');
+  if(builderPickBlockEl) builderPickBlockEl.onchange = (e) => {
+    sessionBuilderDraft.pickBlock = e.target.value;
+    render();
+  };
+  document.querySelectorAll('[data-act="builder-remove"]').forEach(b => b.onclick = () => {
+    const block = b.dataset.block;
+    const idx = parseInt(b.dataset.idx, 10);
+    sessionBuilderDraft[block].splice(idx, 1);
+    render();
+  });
+  const builderAddEl = document.querySelector('[data-act="builder-add"]');
+  if(builderAddEl) builderAddEl.onclick = () => {
+    const customEl = document.querySelector('[data-act="builder-custom-name"]');
+    const selectEl = document.querySelector('[data-act="builder-pick-name"]');
+    const seriesEl = document.querySelector('[data-act="builder-series"]');
+    const customVal = customEl ? customEl.value.trim() : '';
+    const name = customVal || (selectEl ? selectEl.value : '');
+    if(!name){ showToast('Choisis ou tape un exercice'); return; }
+    const series = seriesEl && seriesEl.value ? seriesEl.value.trim() : '';
+    sessionBuilderDraft[sessionBuilderDraft.pickBlock].push({ name, series });
+    render();
+  };
+  const builderSaveEl = document.querySelector('[data-act="builder-save"]');
+  if(builderSaveEl) builderSaveEl.onclick = () => {
+    const total = sessionBuilderDraft.warmup.length + sessionBuilderDraft.main.length + sessionBuilderDraft.cooldown.length;
+    if(!total){ showToast('Ajoute au moins un exercice'); return; }
+    todaySessionCustom[todayStr()] = {
+      discipline: sessionBuilderDraft.discipline,
+      warmup: sessionBuilderDraft.warmup,
+      main: sessionBuilderDraft.main,
+      cooldown: sessionBuilderDraft.cooldown
+    };
+    saveTodaySessionCustom();
+    sessionBuilderOpen = false;
+    sessionBuilderDraft = null;
+    showToast('Séance enregistrée 📝');
+    render();
+  };
 
   document.querySelectorAll('[data-act="program-discipline"]').forEach(b => b.onclick = () => {
     programDiscipline = b.dataset.val;
@@ -3679,6 +3847,7 @@ function startApp(){
   loadNutritionCalc().then(render);
   loadMealPlanState().then(render);
   loadTodaySessionState().then(render);
+  loadTodaySessionCustom().then(render);
   loadCheckins().then(render);
   registerServiceWorker();
   trackEvent('session_start', {});
