@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://grit-app-orcin.vercel.app/sitemap.xml
