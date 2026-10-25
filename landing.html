@@ -20,13 +20,13 @@
 <meta name="theme-color" content="#0d0e13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..900&family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 <style>
   /* Layout concept: dark "track" — full-bleed horizontal bands separated by hairlines, like lanes on a running track, with a Strava-style mono-numeral stat strip and Nike-style oversized display type in the hero. */
   :root{
-    --bg: #0a0b0f;
+    --bg: #060608;
     --surface: #15161d;
     --surface-2: #1d1f29;
     --border: #2a2c38;
@@ -56,7 +56,7 @@
 
   .wrap{ max-width: 1040px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
 
-  h1,h2,h3{ font-family:'Outfit', sans-serif; font-weight:800; letter-spacing:-0.02em; margin:0; text-wrap:balance; }
+  h1,h2,h3{ font-family:'Archivo', sans-serif; font-weight:800; letter-spacing:-0.035em; margin:0; text-wrap:balance; }
   p{ margin:0; line-height:1.6; }
   .eyebrow{ font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color: var(--coral); }
   .mono{ font-family:'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
@@ -72,7 +72,7 @@
   nav .wrap{ display:flex; align-items:center; justify-content:space-between; padding-block: 14px; }
   .brand{ display:flex; align-items:center; gap:10px; }
   .brand .mark{ width:30px; height:30px; flex-shrink:0; }
-  .brand .word{ font-family:'Outfit', sans-serif; font-weight:800; font-size:19px; letter-spacing:-0.01em; }
+  .brand .word{ font-family:'Archivo', sans-serif; font-weight:800; font-size:19px; letter-spacing:-0.01em; }
   .nav-cta{
     font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.06em; text-transform:uppercase;
     background: var(--coral); color:#17120f; padding:9px 16px; border-radius:999px; text-decoration:none;
@@ -101,7 +101,7 @@
   .hero p.lead{ margin-top:18px; font-size:17px; color: var(--text-dim); max-width:46ch; line-height:1.55; }
   .hero-ctas{ display:flex; gap:12px; flex-wrap:wrap; margin-top: 30px; }
   .btn-primary{
-    font-family:'Outfit', sans-serif; font-weight:700; font-size:15px;
+    font-family:'Archivo', sans-serif; font-weight:700; font-size:15px;
     background: var(--coral); color:#17120f; padding:15px 26px; border-radius:14px; text-decoration:none;
     box-shadow: 0 8px 26px rgba(255,107,82,0.3);
     transition: transform 0.15s ease;
@@ -109,7 +109,7 @@
   }
   .btn-primary:active{ transform: scale(0.97); }
   .btn-ghost{
-    font-family:'Outfit', sans-serif; font-weight:600; font-size:15px;
+    font-family:'Archivo', sans-serif; font-weight:600; font-size:15px;
     background: transparent; color: var(--text); padding:14px 22px; border-radius:14px; text-decoration:none;
     border: 1px solid var(--border);
     transition: border-color 0.15s ease, transform 0.15s ease;
@@ -121,7 +121,7 @@
   .stats{ border-top:1px solid var(--border); border-bottom:1px solid var(--border); background: var(--surface); }
   .stats .wrap{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding-block: 32px; }
   @media (max-width: 560px){ .stats .wrap{ grid-template-columns: repeat(2, 1fr); } }
-  .stat .num{ font-family:'Outfit', sans-serif; font-weight:800; font-size: clamp(28px, 6vw, 44px); color: var(--text); letter-spacing:-0.01em; }
+  .stat .num{ font-family:'Archivo', sans-serif; font-weight:800; font-size: clamp(28px, 6vw, 44px); color: var(--text); letter-spacing:-0.01em; }
   .stat .lbl{ font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; color: var(--text-dim); margin-top:4px; }
 
   /* ---- Reveal on scroll ---- */
@@ -147,7 +147,7 @@
     box-shadow: 0 20px 50px rgba(0,0,0,0.4);
   }
   .preview-card .plabel{ font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color: var(--coral); margin-bottom:8px; }
-  .preview-card .ptitle{ font-family:'Outfit', sans-serif; font-weight:700; font-size:16px; margin-bottom:4px; }
+  .preview-card .ptitle{ font-family:'Archivo', sans-serif; font-weight:700; font-size:16px; margin-bottom:4px; }
   .preview-card .pdesc{ font-size:12.5px; color: var(--text-dim); margin-bottom:14px; }
   .preview-card .pbtn{
     border: 1px solid var(--coral); color: var(--coral); background: rgba(255,107,82,0.08);
@@ -201,7 +201,7 @@
   .compare-table{ display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
   @media (max-width: 700px){ .compare-table{ grid-template-columns: 1fr; } }
   .compare-col{ border:1px solid var(--border); border-radius:18px; padding:20px; background: var(--bg); }
-  .compare-head{ font-family:'Outfit', sans-serif; font-weight:700; font-size:15px; padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid var(--border); }
+  .compare-head{ font-family:'Archivo', sans-serif; font-weight:700; font-size:15px; padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid var(--border); }
   .compare-head.without{ color: var(--text-dim); }
   .compare-head.with{ color: var(--coral); }
   .compare-row{ display:flex; gap:10px; align-items:flex-start; padding:9px 0; }
@@ -211,9 +211,79 @@
   /* ---- Footer ---- */
   footer{ padding-block: 40px; border-top:1px solid var(--border); }
   footer .wrap{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; }
-  footer .word{ font-family:'Outfit', sans-serif; font-weight:800; font-size:15px; }
+  footer .word{ font-family:'Archivo', sans-serif; font-weight:800; font-size:15px; }
   footer .tag{ font-family:'IBM Plex Mono', monospace; font-size:11px; color: var(--text-dim); }
   footer a.handle{ color: var(--coral); text-decoration:none; }
+
+  /* ---- Style dynamique (inspiré d'une identité sport sombre, vitre + gros chiffres) ---- */
+  #progress{ position:fixed; top:0; left:0; height:3px; width:100%; background: linear-gradient(90deg, var(--coral), var(--gold)); transform-origin:0 50%; transform: scaleX(0); z-index:100; }
+  .hero{ padding-top: 56px; padding-bottom: 72px; }
+  .hero-grid{ display:grid; grid-template-columns: 1fr; gap: 24px; align-items:center; }
+  @media (max-width: 860px){ .hero-grid{ grid-template-columns: 1fr; gap: 36px; } }
+  .hero h1{ font-size: clamp(44px, 8.4vw, 92px); line-height:0.95; max-width: 9ch; font-weight:900; letter-spacing:-0.045em; font-stretch: 100%; text-transform:none; }
+  .hero h1 .w{ display:inline-block; opacity:0; transform: translateY(0.6em) rotate(2deg); animation: wordUp .8s cubic-bezier(.2,.8,.2,1) forwards; animation-delay: calc(var(--i) * 90ms + 150ms); }
+  @keyframes wordUp{ to{ opacity:1; transform:none; } }
+  .hero p.lead{ font-size:17px; max-width: 40ch; }
+  .hero .eyebrow, .hero p.lead, .hero-ctas{ opacity:0; animation: fadeUp .8s ease forwards; }
+  .hero .eyebrow{ animation-delay:.05s; } .hero p.lead{ animation-delay:.6s; } .hero-ctas{ animation-delay:.8s; }
+  @keyframes fadeUp{ from{ opacity:0; transform: translateY(14px);} to{ opacity:1; transform:none; } }
+  .btn-primary{ position:relative; overflow:hidden; }
+  .btn-primary::after{ content:''; position:absolute; inset:0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%); transform: translateX(-120%); animation: shine 3.6s ease-in-out 1.6s infinite; }
+  @keyframes shine{ 0%{ transform: translateX(-120%);} 40%,100%{ transform: translateX(120%);} }
+
+  .hero-cards{ position:relative; height: 430px; }
+  @media (max-width: 860px){ .hero-cards{ height: 450px; max-width: 460px; width:100%; } }
+  .gpos{ position:absolute; translate: var(--px, 0px) var(--py, 0px); transition: translate .25s ease-out; will-change: translate; }
+  .gcard{
+    background: linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03));
+    border:1px solid rgba(255,255,255,0.14); border-radius:22px; padding:18px;
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    animation: floaty 6.5s ease-in-out infinite alternate; animation-delay: var(--d, 0s);
+  }
+  @keyframes floaty{ from{ transform: translateY(-8px) rotate(-0.6deg);} to{ transform: translateY(10px) rotate(0.6deg);} }
+  .gpos.a{ top:0; left:0; width: min(270px, 62%); --d:0s; }
+  .gpos.b{ top:120px; right:0; width: min(235px, 52%); --d:-2s; }
+  .gpos.c{ bottom:0; left:3%; width: min(215px, 46%); --d:-4s; }
+  @media (max-width: 860px){ .gpos.b{ top:150px; } }
+  .gtag{ display:inline-block; font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color: var(--text-dim); border:1px solid rgba(255,255,255,0.14); border-radius:999px; padding:4px 10px; }
+  .gnum{ font-family:'Archivo', sans-serif; font-weight:800; font-size: clamp(46px, 7vw, 68px); line-height:1; letter-spacing:-0.04em; margin-top:12px; font-variant-numeric: tabular-nums; }
+  .gnum small{ font-size:.45em; letter-spacing:-0.01em; color: var(--text-dim); font-weight:600; margin-left:3px; }
+  .gcard .glabel{ font-size:12.5px; color: var(--text-dim); margin-top:6px; }
+  .gcard .bar{ margin-top:14px; }
+  .gcard .bar > div{ width: var(--w2, 0%); transition: width 1.8s cubic-bezier(.2,.8,.2,1) .2s; }
+  .gcard.go .bar > div{ width: var(--w); }
+  .gcard .gxp{ display:inline-block; margin-top:12px; font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:.06em; color:#17120f; background: var(--gold); padding:5px 10px; border-radius:999px; }
+  .hero-cap{ font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color: var(--text-dim); opacity:.7; margin-top:10px; }
+
+  /* Chiffres */
+  .stat .num{ font-size: clamp(40px, 8vw, 72px); line-height:1; font-weight:800; letter-spacing:-0.05em; font-variant-numeric: tabular-nums; }
+  .stat .num sup{ font-size:.5em; color: var(--coral); vertical-align: top; position:relative; top:.15em; margin-left:2px; }
+  .stats .wrap{ padding-block: 44px; }
+
+  /* Bandeau défilant */
+  .marquee{ overflow:hidden; border-bottom:1px solid var(--border); background: var(--bg); padding: 22px 0; }
+  .marquee-track{ display:flex; width:max-content; animation: marq 38s linear infinite; }
+  .marquee:hover .marquee-track{ animation-play-state: paused; }
+  .marquee-track span{ font-family:'Archivo', sans-serif; font-weight:900; font-size: clamp(30px, 6vw, 56px); letter-spacing:-0.03em; text-transform:uppercase; padding: 0 22px; color: var(--text); white-space:nowrap; }
+  .marquee-track span.o{ color: transparent; -webkit-text-stroke: 1.2px rgba(244,242,236,0.55); }
+  .marquee-track span::after{ content:'✦'; color: var(--coral); font-size:.5em; margin-left:44px; vertical-align: middle; }
+  @keyframes marq{ to{ transform: translateX(-50%); } }
+
+  /* Sections plus vivantes */
+  .section-head h2{ font-size: clamp(30px, 5.2vw, 52px); line-height:1; font-weight:900; letter-spacing:-0.04em; }
+  .feature{ position:relative; overflow:hidden; }
+  .feature::before{ content:''; position:absolute; inset:0; background: radial-gradient(circle at var(--mx,50%) var(--my,0%), rgba(255,107,82,0.16), transparent 55%); opacity:0; transition: opacity .25s ease; pointer-events:none; }
+  .feature:hover::before{ opacity:1; }
+  .feature .ico{ display:inline-block; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+  .feature:hover .ico{ transform: scale(1.25) rotate(-6deg); }
+  .process-step .pnum{ font-size: 34px; font-weight:800; font-family:'Archivo', sans-serif; letter-spacing:-0.04em; }
+  .reveal{ transition: opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1); }
+  .reveal.pending{ transform: translateY(28px); }
+  @media (prefers-reduced-motion: reduce){
+    .hero h1 .w, .hero .eyebrow, .hero p.lead, .hero-ctas{ opacity:1 !important; transform:none !important; }
+    .marquee-track{ animation:none; }
+  }
 
   /* ---- Hero animé (CSS pur + emplacement vidéo optionnelle) ---- */
   .hero-bg{ position:absolute; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
@@ -275,7 +345,7 @@
     display:inline-block; font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;
     color: var(--teal); border:1px solid rgba(79,209,197,0.4); border-radius:999px; padding:3px 9px; margin-bottom:14px;
   }
-  .ex-title{ font-family:'Outfit', sans-serif; font-weight:700; font-size:16px; }
+  .ex-title{ font-family:'Archivo', sans-serif; font-weight:700; font-size:16px; }
   .ex-sub{ font-size:12.5px; color: var(--text-dim); margin-top:4px; line-height:1.5; }
   .ex-btn{
     margin-top:14px; border:1px solid var(--coral); color: var(--coral); background: rgba(255,107,82,0.08);
@@ -321,27 +391,36 @@
   </div>
 </nav>
 
+<div id="progress" aria-hidden="true"></div>
 <header class="hero">
   <div class="hero-bg" id="hero-bg" aria-hidden="true">
     <span class="lane"></span><span class="lane"></span><span class="lane"></span><span class="lane"></span><span class="lane"></span>
   </div>
   <div class="wrap hero-inner">
-    <div class="eyebrow">Entraînement multisport</div>
-    <h1 style="margin-top:14px;">Ton carnet d'entraînement <em>devient intelligent</em>.</h1>
-    <p class="lead">GRIT suit tes séances, s'adapte à ta progression réelle et te pousse à revenir chaque jour — combat, muscu, cardio ou n'importe quelle discipline que tu pratiques.</p>
-    <div class="hero-ctas">
-      <a class="btn-primary" href="https://grit-app-orcin.vercel.app">Ouvrir GRIT →</a>
-      <a class="btn-ghost" href="#comment-ca-marche">Comment ça marche</a>
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <div class="eyebrow">Train · Track · Grind</div>
+        <h1 style="margin-top:16px;" aria-label="Chaque séance compte.">
+          <span class="w" style="--i:0" aria-hidden="true">Chaque</span>
+          <span class="w" style="--i:1" aria-hidden="true">séance</span>
+          <span class="w" style="--i:2" aria-hidden="true"><em>compte.</em></span>
+        </h1>
+        <p class="lead" style="margin-top:22px;">Logue tes séances. Relève le défi du jour. Monte de rang. GRIT s'adapte à ta progression réelle, en combat, muscu, cardio ou n'importe quelle discipline.</p>
+        <div class="hero-ctas">
+          <a class="btn-primary" href="https://grit-app-orcin.vercel.app">Ouvrir GRIT →</a>
+          <a class="btn-ghost" href="#fonctions">Voir les fonctions</a>
+        </div>
+      </div>
     </div>
   </div>
 </header>
 
 <div class="stats">
   <div class="wrap">
-    <div class="stat"><div class="num mono">25+</div><div class="lbl">Disciplines suivies</div></div>
-    <div class="stat"><div class="num mono">365</div><div class="lbl">Défis différents par an</div></div>
-    <div class="stat"><div class="num mono">6</div><div class="lbl">Systèmes de suivi quotidien</div></div>
-    <div class="stat"><div class="num mono">0€</div><div class="lbl">Pour commencer</div></div>
+    <div class="stat reveal pending"><div class="num"><span data-count="25">0</span><sup>+</sup></div><div class="lbl">Disciplines suivies</div></div>
+    <div class="stat reveal pending"><div class="num"><span data-count="365">0</span></div><div class="lbl">Défis différents par an</div></div>
+    <div class="stat reveal pending"><div class="num"><span data-count="6">0</span></div><div class="lbl">Systèmes de suivi quotidien</div></div>
+    <div class="stat reveal pending"><div class="num"><span data-count="5">0</span></div><div class="lbl">Rangs, de Bronze à Diamant</div></div>
   </div>
 </div>
 
@@ -755,6 +834,85 @@
         var p = v.play(); if(p && p.catch) p.catch(function(){});
       }).catch(function(){});
     }
+  }catch(e){ /* no-op */ }
+})();
+
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Chiffres qui montent jusqu'à leur valeur
+  function countUp(el){
+    var target = parseFloat(el.getAttribute('data-count'));
+    if(isNaN(target)) return;
+    if(reduce){ el.textContent = target; return; }
+    var dur = 1900, t0 = null;
+    function ease(x){ return x === 1 ? 1 : 1 - Math.pow(2, -10 * x); }
+    function step(ts){
+      if(t0 === null) t0 = ts;
+      var p = Math.min((ts - t0) / dur, 1);
+      el.textContent = Math.round(target * ease(p));
+      if(p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  try{
+    var counters = document.querySelectorAll('[data-count]');
+    if('IntersectionObserver' in window){
+      var cio = new IntersectionObserver(function(es){
+        es.forEach(function(e){
+          if(!e.isIntersecting) return;
+          cio.unobserve(e.target);
+          var card = e.target.closest('.gcard'); if(card) card.classList.add('go');
+          countUp(e.target);
+        });
+      }, { threshold: 0.4 });
+      counters.forEach(function(c){ cio.observe(c); });
+    } else { counters.forEach(countUp); document.querySelectorAll('.gcard').forEach(function(c){ c.classList.add('go'); }); }
+    if(reduce) document.querySelectorAll('.gcard').forEach(function(c){ c.classList.add('go'); });
+  }catch(e){ /* no-op */ }
+
+  // Apparition en cascade
+  try{
+    document.querySelectorAll('.feature-grid, .process-row, .profile-row, .stats .wrap').forEach(function(g){
+      Array.prototype.forEach.call(g.querySelectorAll('.reveal'), function(el, i){ el.style.transitionDelay = Math.min(i * 80, 480) + 'ms'; });
+    });
+  }catch(e){ /* no-op */ }
+
+  // Barre de progression du défilement + parallaxe des cartes
+  try{
+    var bar = document.getElementById('progress');
+    var gp = Array.prototype.slice.call(document.querySelectorAll('.gpos'));
+    var ticking = false, mx = 0, my = 0;
+    function frame(){
+      ticking = false;
+      var h = document.documentElement.scrollHeight - window.innerHeight;
+      if(bar) bar.style.transform = 'scaleX(' + (h > 0 ? Math.min(window.scrollY / h, 1) : 0) + ')';
+      if(!reduce){
+        gp.forEach(function(g){
+          var d = parseFloat(g.getAttribute('data-depth')) || 0;
+          g.style.setProperty('--px', (mx * d) + 'px');
+          g.style.setProperty('--py', (my * d + window.scrollY * d * -0.012) + 'px');
+        });
+      }
+    }
+    function req(){ if(!ticking){ ticking = true; requestAnimationFrame(frame); } }
+    window.addEventListener('scroll', req, { passive:true });
+    window.addEventListener('resize', req);
+    if(!reduce){
+      window.addEventListener('pointermove', function(e){
+        mx = (e.clientX / window.innerWidth - 0.5) * 2;
+        my = (e.clientY / window.innerHeight - 0.5) * 2;
+        req();
+      }, { passive:true });
+      document.querySelectorAll('.feature').forEach(function(f){
+        f.addEventListener('pointermove', function(e){
+          var r = f.getBoundingClientRect();
+          f.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+          f.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+        });
+      });
+    }
+    req();
   }catch(e){ /* no-op */ }
 })();
 </script>
